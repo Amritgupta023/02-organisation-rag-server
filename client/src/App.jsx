@@ -1,122 +1,111 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from "react";
+import { sendChatMessage } from "./services/chatApi";
+import "./App.css";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [message, setMessage] = useState("");
+  const [conversation, setConversation] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    const trimmedMessage = message.trim();
+
+    if (!trimmedMessage || isLoading) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+    setIsLoading(true);
+
+    setConversation((previousConversation) => [
+      ...previousConversation,
+      {
+        id: crypto.randomUUID(),
+        role: "user",
+        content: trimmedMessage,
+      },
+    ]);
+
+    try {
+      const result = await sendChatMessage(trimmedMessage);
+
+      setConversation((previousConversation) => [
+        ...previousConversation,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: result.answer,
+        },
+      ]);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <main className="app">
+      <section className="chat-container">
+        <header className="chat-header">
+          <h1>Organisation Assistant</h1>
+          <p>Level 1: React, Node.js and Gemini</p>
+        </header>
+
+        <div className="messages">
+          {conversation.length === 0 && (
+            <div className="empty-state">
+              <h2>Start a conversation</h2>
+              <p>Ask Gemini any question to test the integration.</p>
+            </div>
+          )}
+
+          {conversation.map((item) => (
+            <article
+              key={item.id}
+              className={`message message--${item.role}`}
+            >
+              <strong>
+                {item.role === "user" ? "You" : "Assistant"}
+              </strong>
+
+              <p>{item.content}</p>
+            </article>
+          ))}
+
+          {isLoading && (
+            <article className="message message--assistant">
+              <strong>Assistant</strong>
+              <p>Thinking...</p>
+            </article>
+          )}
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
+
+        {error && <p className="error-message">{error}</p>}
+
+        <form className="chat-form" onSubmit={handleSubmit}>
+          <textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Ask something..."
+            rows={3}
+            disabled={isLoading}
+          />
+
+          <button
+            type="submit"
+            disabled={!message.trim() || isLoading}
+          >
+            {isLoading ? "Sending..." : "Send"}
+          </button>
+        </form>
       </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    </main>
+  );
 }
 
-export default App
+export default App;
