@@ -1,4 +1,8 @@
 server/node-modules
 client/node-modules
 node_modules/
+server/.env
+
 .env
+.env.*
+server/.env
