@@ -1,31 +1,36 @@
 import { GoogleGenAI } from "@google/genai";
-
-const apiKey = process.env.GEMINI_API_KEY;
-const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-
-if (!apiKey) {
-  throw new Error("GEMINI_API_KEY is missing in the .env file");
-}
+import { SYSTEM_PROMPT } from "../prompts/system.prompt.js";
+import { AI_CONFIG } from "../config/ai.config.js";
+import { buildPrompt } from "./promptBuilder.js";
 
 const ai = new GoogleGenAI({
-  apiKey,
+    apiKey: process.env.GEMINI_API_KEY
 });
 
 export async function generateGeminiResponse(message) {
-  if (!message || typeof message !== "string") {
-    throw new Error("A valid message is required");
-  }
 
-  const interaction = await ai.interactions.create({
-    model,
-    input: message.trim(),
-  });
+const prompt = buildPrompt(message);
 
-  const answer = interaction.output_text;
+    const response =
+        await ai.models.generateContent({
 
-  if (!answer) {
-    throw new Error("Gemini returned an empty response");
-  }
+            model: AI_CONFIG.MODEL,
 
-  return answer;
+            contents: prompt,
+
+            config: {
+
+                temperature: AI_CONFIG.TEMPERATURE,
+
+                topP: AI_CONFIG.TOP_P,
+
+                topK: AI_CONFIG.TOP_K,
+
+                maxOutputTokens:
+                    AI_CONFIG.MAX_OUTPUT_TOKENS
+            }
+
+        });
+
+    return response.text;
 }

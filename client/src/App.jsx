@@ -52,8 +52,8 @@ function App() {
     <main className="app">
       <section className="chat-container">
         <header className="chat-header">
-          <h1>Organisation Assistant</h1>
-          <p>Level 1: React, Node.js and Gemini</p>
+          <h1>ABC Organisation AI Assistant</h1>
+          <p>Powered by Gemini</p>
         </header>
 
         <div className="messages">
@@ -80,7 +80,7 @@ function App() {
           {isLoading && (
             <article className="message message--assistant">
               <strong>Assistant</strong>
-              <p>Thinking...</p>
+              <p>Assistant is thinking...</p>
             </article>
           )}
         </div>

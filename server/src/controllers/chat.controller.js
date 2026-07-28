@@ -16,7 +16,7 @@ export async function chatController(req, res) {
     return res.status(200).json({
       success: true,
       data: {
-        question: message.trim(),
+        question: message.replace(/\s+/g," "),
         answer,
       },
     });
