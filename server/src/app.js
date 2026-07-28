@@ -1,6 +1,7 @@
-import express from "express";
 import cors from "cors";
+import express from "express";
 import chatRoutes from "./routes/chat.routes.js";
+import conversationRoutes from "./routes/conversation.routes.js";
 
 const app = express();
 
@@ -10,7 +11,11 @@ app.use(
   }),
 );
 
-app.use(express.json());
+app.use(
+  express.json({
+    limit: "1mb",
+  }),
+);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({
@@ -20,6 +25,11 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/chat", chatRoutes);
+
+app.use(
+  "/api/conversations",
+  conversationRoutes,
+);
 
 app.use((req, res) => {
   res.status(404).json({

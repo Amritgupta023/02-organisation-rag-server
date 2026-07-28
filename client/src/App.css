@@ -5,10 +5,11 @@
 body {
   margin: 0;
   font-family:
-    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Inter, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  background: #f3f4f6;
   color: #111827;
+  background: #f3f4f6;
 }
 
 button,
@@ -16,26 +17,126 @@ textarea {
   font: inherit;
 }
 
-.app {
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
   min-height: 100vh;
-  padding: 40px 16px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  color: #ffffff;
+  background: #111827;
+  border-right: 1px solid #1f2937;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid #374151;
+}
+
+.sidebar-header h2 {
+  margin: 0 0 16px;
+}
+
+.new-chat-button {
+  width: 100%;
+  padding: 11px 14px;
+  color: #111827;
+  background: #ffffff;
+  border: 0;
+  border-radius: 8px;
+}
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.no-conversations {
+  padding: 16px 8px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.conversation-item:hover {
+  background: #1f2937;
+}
+
+.conversation-item--active {
+  background: #374151;
+}
+
+.conversation-select-button {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  color: #ffffff;
+  text-align: left;
+  background: transparent;
+  border: 0;
+}
+
+.conversation-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-message-count {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.conversation-delete-button {
+  width: 38px;
+  color: #9ca3af;
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+}
+
+.conversation-delete-button:hover {
+  color: #ffffff;
+  background: #991b1b;
 }
 
 .chat-container {
   display: flex;
   flex-direction: column;
-  width: min(800px, 100%);
-  min-height: calc(100vh - 80px);
-  margin: 0 auto;
-  overflow: hidden;
+  min-width: 0;
+  height: 100vh;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
 }
 
 .chat-header {
-  padding: 24px;
+  padding: 22px 28px;
   border-bottom: 1px solid #e5e7eb;
 }
 
@@ -53,8 +154,7 @@ textarea {
   flex: 1;
   flex-direction: column;
   gap: 16px;
-  min-height: 400px;
-  padding: 24px;
+  padding: 28px;
   overflow-y: auto;
 }
 
@@ -65,7 +165,7 @@ textarea {
 }
 
 .message {
-  max-width: 80%;
+  max-width: min(75%, 700px);
   padding: 14px 16px;
   border-radius: 14px;
 }
@@ -78,48 +178,13 @@ textarea {
 
 .message--user {
   align-self: flex-end;
-  background: #111827;
   color: #ffffff;
+  background: #111827;
 }
 
 .message--assistant {
   align-self: flex-start;
   background: #f3f4f6;
-}
-
-.chat-form {
-  display: flex;
-  gap: 12px;
-  padding: 20px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.chat-form textarea {
-  flex: 1;
-  padding: 12px;
-  resize: none;
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  outline: none;
-}
-
-.chat-form textarea:focus {
-  border-color: #111827;
-}
-
-.chat-form button {
-  align-self: flex-end;
-  padding: 12px 22px;
-  cursor: pointer;
-  color: #ffffff;
-  background: #111827;
-  border: 0;
-  border-radius: 10px;
-}
-
-.chat-form button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 .error-message {
@@ -130,26 +195,71 @@ textarea {
   border-radius: 8px;
 }
 
-@media (max-width: 600px) {
-  .app {
-    padding: 0;
+.chat-form {
+  display: flex;
+  gap: 12px;
+  padding: 20px 28px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  flex: 1;
+}
+
+.input-wrapper textarea {
+  width: 100%;
+  padding: 12px 12px 30px;
+  resize: none;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  outline: none;
+}
+
+.input-wrapper textarea:focus {
+  border-color: #111827;
+}
+
+.character-count {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.chat-form > button {
+  align-self: flex-end;
+  padding: 12px 24px;
+  color: #ffffff;
+  background: #111827;
+  border: 0;
+  border-radius: 10px;
+}
+
+.loading-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  font-family: system-ui, sans-serif;
+}
+
+@media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    min-height: auto;
+    max-height: 260px;
   }
 
   .chat-container {
-    min-height: 100vh;
-    border: 0;
-    border-radius: 0;
+    height: calc(100vh - 260px);
   }
 
   .message {
     max-width: 90%;
-  }
-
-  .chat-form {
-    flex-direction: column;
-  }
-
-  .chat-form button {
-    width: 100%;
   }
 }
