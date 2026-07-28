@@ -1,13 +1,28 @@
-import { SYSTEM_PROMPT }
-from "../prompts/system.prompt.js";
+import {
+  convertHistoryToGeminiContents,
+} from "../utils/conversation.utils.js";
 
-export function buildPrompt(userMessage){
+/**
+ * Gemini ke liye complete multi-turn contents array banata hai.
+ */
+export function buildConversationContents(
+  history,
+  currentMessage,
+) {
+  const previousContents =
+    convertHistoryToGeminiContents(history);
 
-return `
-${SYSTEM_PROMPT}
+  const currentUserContent = {
+    role: "user",
+    parts: [
+      {
+        text: currentMessage,
+      },
+    ],
+  };
 
-User:
-
-${userMessage}
-`;
+  return [
+    ...previousContents,
+    currentUserContent,
+  ];
 }

@@ -1,36 +1,50 @@
 import { GoogleGenAI } from "@google/genai";
-import { SYSTEM_PROMPT } from "../prompts/system.prompt.js";
 import { AI_CONFIG } from "../config/ai.config.js";
-import { buildPrompt } from "./promptBuilder.js";
+import { SYSTEM_PROMPT } from "../prompts/system.prompt.js";
+import {
+  buildConversationContents,
+} from "./promptBuilder.js";
+
+const apiKey = process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  throw new Error(
+    "GEMINI_API_KEY is missing in the .env file",
+  );
+}
 
 const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY
+  apiKey,
 });
 
-export async function generateGeminiResponse(message) {
+export async function generateGeminiResponse({
+  message,
+  history = [],
+}) {
+  const contents = buildConversationContents(
+    history,
+    message,
+  );
 
-const prompt = buildPrompt(message);
+  const response = await ai.models.generateContent({
+    model: AI_CONFIG.MODEL,
 
-    const response =
-        await ai.models.generateContent({
+    contents,
 
-            model: AI_CONFIG.MODEL,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      temperature: AI_CONFIG.TEMPERATURE,
+      topP: AI_CONFIG.TOP_P,
+      topK: AI_CONFIG.TOP_K,
+      maxOutputTokens: AI_CONFIG.MAX_OUTPUT_TOKENS,
+    },
+  });
 
-            contents: prompt,
+  const answer = response.text?.trim();
 
-            config: {
+  if (!answer) {
+    throw new Error("Gemini returned an empty response");
+  }
 
-                temperature: AI_CONFIG.TEMPERATURE,
-
-                topP: AI_CONFIG.TOP_P,
-
-                topK: AI_CONFIG.TOP_K,
-
-                maxOutputTokens:
-                    AI_CONFIG.MAX_OUTPUT_TOKENS
-            }
-
-        });
-
-    return response.text;
+  return answer;
 }

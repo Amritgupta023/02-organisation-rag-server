@@ -1,35 +1,63 @@
+import { AI_CONFIG } from "../config/ai.config.js";
 import { generateGeminiResponse } from "../services/gemini.service.js";
+import {
+  sanitizeHistory,
+  sanitizeMessage,
+} from "../utils/conversation.utils.js";
 
 export async function chatController(req, res) {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
 
-    if (!message || typeof message !== "string" || !message.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Message is required",
-      });
-    }
+    const sanitizedMessage =
+      sanitizeMessage(message);
 
-    const answer = await generateGeminiResponse(message);
+    const sanitizedHistory =
+      sanitizeHistory(history);
+
+    const answer = await generateGeminiResponse({
+      message: sanitizedMessage,
+      history: sanitizedHistory,
+    });
 
     return res.status(200).json({
       success: true,
+
       data: {
-        question: message.replace(/\s+/g," "),
+        question: sanitizedMessage,
         answer,
+        model: AI_CONFIG.MODEL,
+        historyMessagesUsed:
+          sanitizedHistory.length,
+        timestamp: new Date().toISOString(),
       },
     });
   } catch (error) {
     console.error("Chat controller error:", error);
 
-    return res.status(500).json({
-      success: false,
-      message: "Unable to generate Gemini response",
-      error:
-        process.env.NODE_ENV === "development"
+    const validationErrors = [
+      "Message must be a string",
+      "Message is required",
+      "Message cannot exceed",
+      "History must be an array",
+    ];
+
+    const isValidationError =
+      validationErrors.some((validationError) =>
+        error.message.startsWith(validationError),
+      );
+
+    return res
+      .status(isValidationError ? 400 : 500)
+      .json({
+        success: false,
+        message: isValidationError
           ? error.message
-          : undefined,
-    });
+          : "Unable to generate Gemini response",
+        error:
+          process.env.NODE_ENV === "development"
+            ? error.message
+            : undefined,
+      });
   }
 }
