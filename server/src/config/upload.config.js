@@ -1,0 +1,11 @@
+export const UPLOAD_CONFIG = {
+  MAX_FILE_SIZE: 5 * 1024 * 1024,
+
+  ALLOWED_MIME_TYPES: ["application/pdf"],
+
+  FILE_FIELD_NAME: "document",
+
+  MAX_EXTRACTED_TEXT_LENGTH: 5_000_000,
+
+  TEXT_PREVIEW_LENGTH: 1000,
+};

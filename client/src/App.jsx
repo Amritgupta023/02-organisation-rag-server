@@ -4,9 +4,9 @@ import {
   useState,
 } from "react";
 import ConversationSidebar from "./components/ConversationSidebar";
+import DocumentManager from "./components/DocumentManager";
 import { sendChatMessage } from "./services/chatApi";
 import {
-  createConversation,
   deleteConversation,
   getConversation,
   getConversations,
@@ -14,15 +14,16 @@ import {
 import "./App.css";
 
 function App() {
+  const [activeView, setActiveView] =
+    useState("chat");
+
   const [message, setMessage] = useState("");
 
   const [conversation, setConversation] =
     useState([]);
 
-  const [
-    conversations,
-    setConversations,
-  ] = useState([]);
+  const [conversations, setConversations] =
+    useState([]);
 
   const [
     selectedConversationId,
@@ -92,13 +93,27 @@ function App() {
     }
 
     initializeApplication();
-  }, [loadConversation, loadConversationList]);
+  }, [
+    loadConversation,
+    loadConversationList,
+  ]);
 
-  async function handleNewConversation() {
+  function handleChatView() {
+    setActiveView("chat");
+    setError("");
+  }
+
+  function handleDocumentsView() {
+    setActiveView("documents");
+    setError("");
+  }
+
+  function handleNewConversation() {
     if (isLoading) {
       return;
     }
 
+    setActiveView("chat");
     setMessage("");
     setConversation([]);
     setSelectedConversationId(null);
@@ -112,11 +127,15 @@ function App() {
       isLoading ||
       conversationId === selectedConversationId
     ) {
+      setActiveView("chat");
       return;
     }
 
     try {
+      setActiveView("chat");
       setIsLoading(true);
+      setError("");
+
       await loadConversation(conversationId);
     } catch (requestError) {
       setError(requestError.message);
@@ -252,7 +271,7 @@ function App() {
   if (isInitialLoading) {
     return (
       <main className="loading-screen">
-        Loading conversations...
+        Loading application...
       </main>
     );
   }
@@ -276,103 +295,142 @@ function App() {
         }
       />
 
-      <section className="chat-container">
-        <header className="chat-header">
-          <div>
-            <h1>
-              ABC Organisation Assistant
-            </h1>
-
-            <p>
-              Level 4: MongoDB persistent
-              conversation history
-            </p>
-          </div>
-        </header>
-
-        <div className="messages">
-          {conversation.length === 0 && (
-            <div className="empty-state">
-              <h2>Start a new conversation</h2>
-
-              <p>
-                Your conversation will be saved
-                automatically.
-              </p>
-            </div>
-          )}
-
-          {conversation.map((item) => (
-            <article
-              key={item.id}
-              className={`message message--${item.role}`}
-            >
-              <strong>
-                {item.role === "user"
-                  ? "You"
-                  : "Assistant"}
-              </strong>
-
-              <p>{item.content}</p>
-            </article>
-          ))}
-
-          {isLoading && (
-            <article className="message message--assistant">
-              <strong>Assistant</strong>
-              <p>
-                Assistant is thinking...
-              </p>
-            </article>
-          )}
-        </div>
-
-        {error && (
-          <p className="error-message">
-            {error}
-          </p>
-        )}
-
-        <form
-          className="chat-form"
-          onSubmit={handleSubmit}
-        >
-          <div className="input-wrapper">
-            <textarea
-              value={message}
-              onChange={(event) => {
-                setMessage(
-                  event.target.value,
-                );
-
-                if (error) {
-                  setError("");
-                }
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask something..."
-              rows={3}
-              maxLength={2000}
-              disabled={isLoading}
-            />
-
-            <span className="character-count">
-              {message.length}/2000
-            </span>
-          </div>
+      <div className="main-content">
+        <nav className="view-tabs">
+          <button
+            type="button"
+            className={
+              activeView === "chat"
+                ? "view-tab view-tab--active"
+                : "view-tab"
+            }
+            onClick={handleChatView}
+          >
+            Chat
+          </button>
 
           <button
-            type="submit"
-            disabled={
-              !message.trim() || isLoading
+            type="button"
+            className={
+              activeView === "documents"
+                ? "view-tab view-tab--active"
+                : "view-tab"
             }
+            onClick={handleDocumentsView}
           >
-            {isLoading
-              ? "Sending..."
-              : "Send"}
+            Documents
           </button>
-        </form>
-      </section>
+        </nav>
+
+        {activeView === "chat" && (
+          <section className="chat-container">
+            <header className="chat-header">
+              <div>
+                <h1>
+                  ABC Organisation Assistant
+                </h1>
+
+                <p>
+                  Persistent conversation history
+                  with MongoDB
+                </p>
+              </div>
+            </header>
+
+            <div className="messages">
+              {conversation.length === 0 &&
+                !isLoading && (
+                  <div className="empty-state">
+                    <h2>
+                      Start a new conversation
+                    </h2>
+
+                    <p>
+                      Your messages will be saved
+                      automatically.
+                    </p>
+                  </div>
+                )}
+
+              {conversation.map((item) => (
+                <article
+                  key={item.id}
+                  className={`message message--${item.role}`}
+                >
+                  <strong>
+                    {item.role === "user"
+                      ? "You"
+                      : "Assistant"}
+                  </strong>
+
+                  <p>{item.content}</p>
+                </article>
+              ))}
+
+              {isLoading && (
+                <article className="message message--assistant">
+                  <strong>Assistant</strong>
+
+                  <p>
+                    Assistant is thinking...
+                  </p>
+                </article>
+              )}
+            </div>
+
+            {error && (
+              <p className="error-message">
+                {error}
+              </p>
+            )}
+
+            <form
+              className="chat-form"
+              onSubmit={handleSubmit}
+            >
+              <div className="input-wrapper">
+                <textarea
+                  value={message}
+                  onChange={(event) => {
+                    setMessage(
+                      event.target.value,
+                    );
+
+                    if (error) {
+                      setError("");
+                    }
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask something..."
+                  rows={3}
+                  maxLength={2000}
+                  disabled={isLoading}
+                />
+
+                <span className="character-count">
+                  {message.length}/2000
+                </span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={
+                  !message.trim() ||
+                  isLoading
+                }
+              >
+                {isLoading
+                  ? "Sending..."
+                  : "Send"}
+              </button>
+            </form>
+          </section>
+        )}
+
+        {activeView === "documents" && (
+          <DocumentManager />
+        )}
+      </div>
     </main>
   );
 }
