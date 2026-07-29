@@ -13,23 +13,32 @@ async function processSingleChunk({
   document,
 }) {
   const pointId =
-    chunk.qdrantPointId || randomUUID();
+    chunk.qdrantPointId ||
+    randomUUID();
 
   try {
     await DocumentChunk.findByIdAndUpdate(
       chunk._id,
       {
         $set: {
-          embeddingStatus: "processing",
+          embeddingStatus:
+            "processing",
+
           embeddingError: null,
         },
+      },
+      {
+        runValidators: true,
       },
     );
 
     const vector =
-      await createDocumentEmbedding(
-        chunk.content,
-      );
+      await createDocumentEmbedding({
+        content: chunk.content,
+
+        title:
+          document.originalName,
+      });
 
     await upsertChunkVector({
       pointId,
@@ -42,20 +51,31 @@ async function processSingleChunk({
       chunk._id,
       {
         $set: {
-          embeddingStatus: "completed",
+          embeddingStatus:
+            "completed",
+
           embeddingModel:
             EMBEDDING_CONFIG.MODEL,
+
           embeddingDimensions:
             EMBEDDING_CONFIG.VECTOR_SIZE,
+
           qdrantPointId: pointId,
+
           embeddedAt: new Date(),
+
           embeddingError: null,
         },
+      },
+      {
+        runValidators: true,
       },
     );
 
     return {
-      chunkId: chunk._id,
+      chunkId:
+        chunk._id.toString(),
+
       success: true,
     };
   } catch (error) {
@@ -64,21 +84,102 @@ async function processSingleChunk({
       {
         $set: {
           embeddingStatus: "failed",
+
           embeddingError:
             error.message ||
             "Embedding generation failed",
         },
       },
+      {
+        runValidators: true,
+      },
     );
 
     return {
-      chunkId: chunk._id,
+      chunkId:
+        chunk._id.toString(),
+
       success: false,
+
       error:
         error.message ||
         "Embedding generation failed",
     };
   }
+}
+
+async function updateDocumentEmbeddingSummary(
+  documentId,
+) {
+  const [
+    completedChunkCount,
+    failedChunkCount,
+    totalChunkCount,
+  ] = await Promise.all([
+    DocumentChunk.countDocuments({
+      documentId,
+      embeddingStatus: "completed",
+    }),
+
+    DocumentChunk.countDocuments({
+      documentId,
+      embeddingStatus: "failed",
+    }),
+
+    DocumentChunk.countDocuments({
+      documentId,
+    }),
+  ]);
+
+  let finalStatus = "completed";
+
+  if (
+    totalChunkCount === 0 ||
+    completedChunkCount === 0
+  ) {
+    finalStatus = "failed";
+  } else if (
+    completedChunkCount <
+    totalChunkCount
+  ) {
+    finalStatus =
+      "partially_failed";
+  }
+
+  await Document.findByIdAndUpdate(
+    documentId,
+    {
+      $set: {
+        embeddingStatus: finalStatus,
+
+        embeddedChunkCount:
+          completedChunkCount,
+
+        failedChunkCount,
+
+        embeddingModel:
+          EMBEDDING_CONFIG.MODEL,
+
+        embeddingDimensions:
+          EMBEDDING_CONFIG.VECTOR_SIZE,
+
+        embeddedAt:
+          finalStatus === "completed"
+            ? new Date()
+            : null,
+      },
+    },
+    {
+      runValidators: true,
+    },
+  );
+
+  return {
+    totalChunkCount,
+    completedChunkCount,
+    failedChunkCount,
+    finalStatus,
+  };
 }
 
 export async function embedDocumentChunks(
@@ -102,7 +203,9 @@ export async function embedDocumentChunks(
     throw error;
   }
 
-  if (document.status !== "processed") {
+  if (
+    document.status !== "processed"
+  ) {
     const error = new Error(
       "Only processed documents can be embedded",
     );
@@ -118,35 +221,46 @@ export async function embedDocumentChunks(
 
   if (!force) {
     chunkFilter.embeddingStatus = {
-      $in: ["pending", "failed"],
+      $in: [
+        "pending",
+        "failed",
+        "processing",
+      ],
     };
   }
 
-  const chunks = await DocumentChunk.find(
-    chunkFilter,
-  ).sort({
-    chunkIndex: 1,
-  });
+  const chunks =
+    await DocumentChunk.find(
+      chunkFilter,
+    ).sort({
+      chunkIndex: 1,
+    });
 
   if (!chunks.length) {
-    const existingCompletedCount =
-      await DocumentChunk.countDocuments({
-        documentId: document._id,
-        embeddingStatus: "completed",
-      });
+    const summary =
+      await updateDocumentEmbeddingSummary(
+        document._id,
+      );
 
     return {
-      documentId: document._id,
-      totalChunks: document.chunkCount,
+      documentId:
+        document._id.toString(),
+
+      totalChunks:
+        summary.totalChunkCount,
+
       processedNow: 0,
+
       completedChunks:
-        existingCompletedCount,
-      failedChunks: 0,
+        summary.completedChunkCount,
+
+      failedChunks:
+        summary.failedChunkCount,
+
       status:
-        existingCompletedCount ===
-        document.chunkCount
-          ? "completed"
-          : document.embeddingStatus,
+        summary.finalStatus,
+
+      errors: [],
     };
   }
 
@@ -154,25 +268,30 @@ export async function embedDocumentChunks(
     document._id,
     {
       $set: {
-        embeddingStatus: "processing",
+        embeddingStatus:
+          "processing",
+
         embeddingModel:
           EMBEDDING_CONFIG.MODEL,
+
         embeddingDimensions:
           EMBEDDING_CONFIG.VECTOR_SIZE,
+
+        failedChunkCount: 0,
       },
+    },
+    {
+      runValidators: true,
     },
   );
 
   const results = [];
 
-  /*
-   * Small batches process karenge.
-   * Batch ke andar parallel calls.
-   */
   for (
     let index = 0;
     index < chunks.length;
-    index += EMBEDDING_CONFIG.BATCH_SIZE
+    index +=
+      EMBEDDING_CONFIG.BATCH_SIZE
   ) {
     const batch = chunks.slice(
       index,
@@ -193,64 +312,40 @@ export async function embedDocumentChunks(
     results.push(...batchResults);
   }
 
-  const completedChunkCount =
-    await DocumentChunk.countDocuments({
-      documentId: document._id,
-      embeddingStatus: "completed",
-    });
-
-  const failedChunkCount =
-    await DocumentChunk.countDocuments({
-      documentId: document._id,
-      embeddingStatus: "failed",
-    });
-
-  let finalStatus = "completed";
-
-  if (completedChunkCount === 0) {
-    finalStatus = "failed";
-  } else if (failedChunkCount > 0) {
-    finalStatus = "partially_failed";
-  }
-
-  await Document.findByIdAndUpdate(
-    document._id,
-    {
-      $set: {
-        embeddingStatus: finalStatus,
-
-        embeddedChunkCount:
-          completedChunkCount,
-
-        failedChunkCount,
-
-        embeddingModel:
-          EMBEDDING_CONFIG.MODEL,
-
-        embeddingDimensions:
-          EMBEDDING_CONFIG.VECTOR_SIZE,
-
-        embeddedAt:
-          finalStatus === "completed"
-            ? new Date()
-            : null,
-      },
-    },
-  );
+  const summary =
+    await updateDocumentEmbeddingSummary(
+      document._id,
+    );
 
   return {
-    documentId: document._id,
-    totalChunks: document.chunkCount,
+    documentId:
+      document._id.toString(),
+
+    totalChunks:
+      summary.totalChunkCount,
+
     processedNow: results.length,
+
     completedChunks:
-      completedChunkCount,
-    failedChunks: failedChunkCount,
-    status: finalStatus,
+      summary.completedChunkCount,
+
+    failedChunks:
+      summary.failedChunkCount,
+
+    status:
+      summary.finalStatus,
+
     errors: results
-      .filter((result) => !result.success)
+      .filter(
+        (result) =>
+          !result.success,
+      )
       .map((result) => ({
-        chunkId: result.chunkId,
-        message: result.error,
+        chunkId:
+          result.chunkId,
+
+        message:
+          result.error,
       })),
   };
 }

@@ -53,32 +53,30 @@ function validateEmbeddingVector(vector) {
     EMBEDDING_CONFIG.VECTOR_SIZE
   ) {
     throw new Error(
-      `Expected ${EMBEDDING_CONFIG.VECTOR_SIZE} dimensions but received ${vector.length}`,
+      `Expected ${EMBEDDING_CONFIG.VECTOR_SIZE} embedding dimensions but received ${vector.length}`,
     );
   }
 
-  const hasInvalidValue = vector.some(
+  const containsInvalidValue = vector.some(
     (value) =>
       typeof value !== "number" ||
       !Number.isFinite(value),
   );
 
-  if (hasInvalidValue) {
+  if (containsInvalidValue) {
     throw new Error(
       "Gemini returned an invalid embedding vector",
     );
   }
 }
 
-export async function createDocumentEmbedding(
-  content,
-) {
+async function createEmbedding(input) {
   if (
-    typeof content !== "string" ||
-    !content.trim()
+    typeof input !== "string" ||
+    !input.trim()
   ) {
     throw new Error(
-      "Chunk content is required for embedding",
+      "Embedding input is required",
     );
   }
 
@@ -92,19 +90,14 @@ export async function createDocumentEmbedding(
     try {
       const response =
         await ai.models.embedContent({
-          model: EMBEDDING_CONFIG.MODEL,
+          model:
+            EMBEDDING_CONFIG.MODEL,
 
-          contents: content.trim(),
+          contents: input.trim(),
 
           config: {
-            taskType:
-              EMBEDDING_CONFIG.DOCUMENT_TASK_TYPE,
-
             outputDimensionality:
               EMBEDDING_CONFIG.VECTOR_SIZE,
-
-            title:
-              "Organisation document chunk",
           },
         });
 
@@ -138,5 +131,52 @@ export async function createDocumentEmbedding(
   throw new Error(
     lastError?.message ||
       "Unable to generate Gemini embedding",
+  );
+}
+
+export async function createDocumentEmbedding({
+  content,
+  title,
+}) {
+  if (
+    typeof content !== "string" ||
+    !content.trim()
+  ) {
+    throw new Error(
+      "Document content is required for embedding",
+    );
+  }
+
+  const documentTitle =
+    typeof title === "string" &&
+    title.trim()
+      ? title.trim()
+      : "none";
+
+  const formattedDocument =
+    `title: ${documentTitle} | text: ${content.trim()}`;
+
+  return createEmbedding(
+    formattedDocument,
+  );
+}
+
+export async function createQueryEmbedding(
+  query,
+) {
+  if (
+    typeof query !== "string" ||
+    !query.trim()
+  ) {
+    throw new Error(
+      "Question is required for embedding",
+    );
+  }
+
+  const formattedQuery =
+    `task: question answering | query: ${query.trim()}`;
+
+  return createEmbedding(
+    formattedQuery,
   );
 }

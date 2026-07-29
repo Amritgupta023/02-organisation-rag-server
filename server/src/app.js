@@ -5,6 +5,8 @@ import conversationRoutes from "./routes/conversation.routes.js";
 import documentRoutes from "./routes/document.routes.js";
 import documentChunkRoutes from "./routes/document-chunk.routes.js";
 import documentEmbeddingRoutes from "./routes/document-embedding.routes.js";
+import qdrantRoutes from "./routes/qdrant.routes.js";
+import ragRoutes from "./routes/rag.routes.js";
 import {
   errorMiddleware,
 } from "./middlewares/error.middleware.js";
@@ -81,6 +83,16 @@ app.use(
 app.use(
   "/api",
   documentEmbeddingRoutes,
+);
+
+app.use(
+  "/api",
+  qdrantRoutes,
+);
+
+app.use(
+  "/api/rag",
+  ragRoutes,
 );
 
 app.use((req, res) => {

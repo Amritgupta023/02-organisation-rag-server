@@ -5,17 +5,17 @@ import {
 import { EMBEDDING_CONFIG } from "../config/embedding.config.js";
 
 export async function ensureQdrantCollection() {
-  const collectionsResponse =
+  const collections =
     await qdrantClient.getCollections();
 
-  const collectionExists =
-    collectionsResponse.collections.some(
+  const exists =
+    collections.collections.some(
       (collection) =>
         collection.name ===
         QDRANT_COLLECTION_NAME,
     );
 
-  if (!collectionExists) {
+  if (!exists) {
     await qdrantClient.createCollection(
       QDRANT_COLLECTION_NAME,
       {
@@ -28,7 +28,7 @@ export async function ensureQdrantCollection() {
     );
 
     console.log(
-      `Qdrant collection created: ${QDRANT_COLLECTION_NAME}`,
+      `Created Qdrant collection: ${QDRANT_COLLECTION_NAME}`,
     );
 
     return;
@@ -39,11 +39,9 @@ export async function ensureQdrantCollection() {
       QDRANT_COLLECTION_NAME,
     );
 
-  const vectorConfiguration =
-    collectionInfo.config?.params?.vectors;
-
   const configuredVectorSize =
-    vectorConfiguration?.size;
+    collectionInfo.config?.params
+      ?.vectors?.size;
 
   if (
     configuredVectorSize &&
@@ -51,7 +49,7 @@ export async function ensureQdrantCollection() {
       EMBEDDING_CONFIG.VECTOR_SIZE
   ) {
     throw new Error(
-      `Qdrant collection vector size is ${configuredVectorSize}, but application vector size is ${EMBEDDING_CONFIG.VECTOR_SIZE}`,
+      `Qdrant vector size mismatch. Expected ${EMBEDDING_CONFIG.VECTOR_SIZE}, found ${configuredVectorSize}.`,
     );
   }
 }
@@ -62,7 +60,19 @@ export async function upsertChunkVector({
   chunk,
   document,
 }) {
-  await qdrantClient.upsert(
+  if (
+    !Array.isArray(vector) ||
+    vector.length !==
+      EMBEDDING_CONFIG.VECTOR_SIZE
+  ) {
+    throw new Error(
+      `Vector must contain ${EMBEDDING_CONFIG.VECTOR_SIZE} dimensions.`,
+    );
+  }
+
+  await ensureQdrantCollection();
+
+  return qdrantClient.upsert(
     QDRANT_COLLECTION_NAME,
     {
       wait: true,
@@ -93,8 +103,8 @@ export async function upsertChunkVector({
               document.sourceType,
 
             pageNumber:
-              chunk.metadata?.pageNumber ??
-              null,
+              chunk.metadata
+                ?.pageNumber ?? null,
 
             characterCount:
               chunk.characterCount,
@@ -114,12 +124,142 @@ export async function upsertChunkVector({
   );
 }
 
+export async function searchSimilarChunks({
+  vector,
+  limit = 5,
+  scoreThreshold = 0.3,
+  documentId,
+}) {
+  await ensureQdrantCollection();
+
+  const query = {
+    query: vector,
+
+    limit,
+
+    score_threshold:
+      scoreThreshold,
+
+    with_payload: true,
+
+    with_vector: false,
+  };
+
+  if (documentId) {
+    query.filter = {
+      must: [
+        {
+          key: "documentId",
+
+          match: {
+            value:
+              documentId.toString(),
+          },
+        },
+      ],
+    };
+  }
+
+  const response =
+    await qdrantClient.query(
+      QDRANT_COLLECTION_NAME,
+      query,
+    );
+
+  const points =
+    response?.points ||
+    response?.result?.points ||
+    response?.result ||
+    [];
+
+  return points.map((point) => ({
+    pointId:
+      point.id?.toString(),
+
+    score:
+      Number(point.score) || 0,
+
+    chunkId:
+      point.payload.chunkId,
+
+    documentId:
+      point.payload.documentId,
+
+    chunkIndex:
+      point.payload.chunkIndex,
+
+    content:
+      point.payload.content,
+
+    originalName:
+      point.payload.originalName,
+
+    sourceType:
+      point.payload.sourceType,
+
+    pageNumber:
+      point.payload.pageNumber,
+
+    startCharacter:
+      point.payload.startCharacter,
+
+    endCharacter:
+      point.payload.endCharacter,
+  }));
+}
+
+export async function getQdrantCollectionInfo() {
+  await ensureQdrantCollection();
+
+  return qdrantClient.getCollection(
+    QDRANT_COLLECTION_NAME,
+  );
+}
+
+export async function getQdrantPoints({
+  limit = 5,
+} = {}) {
+  await ensureQdrantCollection();
+
+  const response =
+    await qdrantClient.scroll(
+      QDRANT_COLLECTION_NAME,
+      {
+        limit,
+
+        with_payload: true,
+
+        with_vector: true,
+      },
+    );
+
+  const points =
+    response.points ||
+    response.result?.points ||
+    [];
+
+  return points.map((point) => ({
+    id: point.id,
+
+    payload:
+      point.payload,
+
+    vector:
+      point.vector,
+
+    vectorDimensions:
+      Array.isArray(point.vector)
+        ? point.vector.length
+        : 0,
+  }));
+}
+
 export async function deleteDocumentVectors(
   documentId,
 ) {
   await ensureQdrantCollection();
 
-  await qdrantClient.delete(
+  return qdrantClient.delete(
     QDRANT_COLLECTION_NAME,
     {
       wait: true,
