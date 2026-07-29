@@ -1,23 +1,32 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
 import {
   deleteDocument,
+  generateDocumentEmbeddings,
   getDocument,
   getDocumentChunks,
   getDocuments,
   uploadDocument,
 } from "../services/documentApi";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE =
+  5 * 1024 * 1024;
 
 function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes)) {
+    return "Unknown size";
+  }
+
   if (bytes < 1024) {
     return `${bytes} bytes`;
   }
 
   if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(
-      1,
-    )} KB`;
+    return `${(
+      bytes / 1024
+    ).toFixed(1)} KB`;
   }
 
   return `${(
@@ -26,88 +35,72 @@ function formatFileSize(bytes) {
   ).toFixed(1)} MB`;
 }
 
-function DocumentManager() {
-  const [selectedFile, setSelectedFile] =
-    useState(null);
+function formatDate(dateValue) {
+  if (!dateValue) {
+    return "Not available";
+  }
 
-  const [documents, setDocuments] =
-    useState([]);
+  return new Date(
+    dateValue,
+  ).toLocaleString();
+}
+
+function DocumentManager() {
+  const [
+    selectedFile,
+    setSelectedFile,
+  ] = useState(null);
+
+  const [
+    documents,
+    setDocuments,
+  ] = useState([]);
 
   const [
     selectedDocument,
     setSelectedDocument,
   ] = useState(null);
 
-  const [chunks, setChunks] = useState([]);
+  const [
+    chunks,
+    setChunks,
+  ] = useState([]);
 
-  const [previewMode, setPreviewMode] =
-    useState("text");
+  const [
+    previewMode,
+    setPreviewMode,
+  ] = useState("text");
 
-  const [isLoading, setIsLoading] =
-    useState(false);
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(false);
 
-  const [isUploading, setIsUploading] =
-    useState(false);
+  const [
+    isUploading,
+    setIsUploading,
+  ] = useState(false);
 
-  const [error, setError] = useState("");
+  const [
+    embeddingDocumentId,
+    setEmbeddingDocumentId,
+  ] = useState(null);
+
+  const [
+    deletingDocumentId,
+    setDeletingDocumentId,
+  ] = useState(null);
+
+  const [error, setError] =
+    useState("");
 
   async function loadDocuments() {
-    const result = await getDocuments();
+    const result =
+      await getDocuments();
 
     setDocuments(result);
 
     return result;
-  }
-
-  useEffect(() => {
-    async function initializeDocuments() {
-      try {
-        setIsLoading(true);
-        await loadDocuments();
-      } catch (requestError) {
-        setError(requestError.message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    initializeDocuments();
-  }, []);
-
-  function handleFileChange(event) {
-    const file = event.target.files?.[0];
-
-    setError("");
-    setSelectedFile(null);
-
-    if (!file) {
-      return;
-    }
-
-    if (file.type !== "application/pdf") {
-      setError("Please select a PDF file");
-      event.target.value = "";
-      return;
-    }
-
-    if (
-      !file.name.toLowerCase().endsWith(".pdf")
-    ) {
-      setError(
-        "File must have a .pdf extension",
-      );
-
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      setError("PDF cannot exceed 5 MB");
-      event.target.value = "";
-      return;
-    }
-
-    setSelectedFile(file);
   }
 
   async function loadDocumentDetails(
@@ -118,17 +111,120 @@ function DocumentManager() {
       chunkResult,
     ] = await Promise.all([
       getDocument(documentId),
-      getDocumentChunks(documentId),
+
+      getDocumentChunks(
+        documentId,
+      ),
     ]);
 
-    setSelectedDocument(documentResult);
-    setChunks(chunkResult.chunks);
+    setSelectedDocument(
+      documentResult,
+    );
+
+    setChunks(
+      chunkResult.chunks || [],
+    );
   }
 
-  async function handleUpload(event) {
+  useEffect(() => {
+    const abortController =
+      new AbortController();
+
+    async function initializeDocuments() {
+      try {
+        setIsLoading(true);
+        setError("");
+
+        await loadDocuments();
+      } catch (requestError) {
+        if (
+          !abortController.signal
+            .aborted
+        ) {
+          setError(
+            requestError.message,
+          );
+        }
+      } finally {
+        if (
+          !abortController.signal
+            .aborted
+        ) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    initializeDocuments();
+
+    return () => {
+      abortController.abort();
+    };
+  }, []);
+
+  function handleFileChange(event) {
+    const file =
+      event.target.files?.[0];
+
+    setError("");
+    setSelectedFile(null);
+
+    if (!file) {
+      return;
+    }
+
+    if (
+      file.type !==
+      "application/pdf"
+    ) {
+      setError(
+        "Please select a PDF file",
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+    if (
+      !file.name
+        .toLowerCase()
+        .endsWith(".pdf")
+    ) {
+      setError(
+        "File must have a .pdf extension",
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+    if (
+      file.size >
+      MAX_FILE_SIZE
+    ) {
+      setError(
+        "PDF cannot exceed 5 MB",
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+    setSelectedFile(file);
+  }
+
+  async function handleUpload(
+    event,
+  ) {
     event.preventDefault();
 
-    if (!selectedFile || isUploading) {
+    if (
+      !selectedFile ||
+      isUploading
+    ) {
       return;
     }
 
@@ -137,7 +233,9 @@ function DocumentManager() {
       setError("");
 
       const uploadedDocument =
-        await uploadDocument(selectedFile);
+        await uploadDocument(
+          selectedFile,
+        );
 
       setSelectedFile(null);
 
@@ -158,7 +256,9 @@ function DocumentManager() {
 
       setPreviewMode("chunks");
     } catch (requestError) {
-      setError(requestError.message);
+      setError(
+        requestError.message,
+      );
     } finally {
       setIsUploading(false);
     }
@@ -175,9 +275,47 @@ function DocumentManager() {
         documentId,
       );
     } catch (requestError) {
-      setError(requestError.message);
+      setError(
+        requestError.message,
+      );
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleGenerateEmbeddings(
+    documentId,
+    force = false,
+  ) {
+    try {
+      setEmbeddingDocumentId(
+        documentId,
+      );
+
+      setError("");
+
+      await generateDocumentEmbeddings(
+        documentId,
+        {
+          force,
+        },
+      );
+
+      await loadDocuments();
+
+      await loadDocumentDetails(
+        documentId,
+      );
+
+      setPreviewMode("chunks");
+    } catch (requestError) {
+      setError(
+        requestError.message,
+      );
+    } finally {
+      setEmbeddingDocumentId(
+        null,
+      );
     }
   }
 
@@ -185,27 +323,39 @@ function DocumentManager() {
     documentId,
   ) {
     try {
-      setIsLoading(true);
+      setDeletingDocumentId(
+        documentId,
+      );
+
       setError("");
 
-      await deleteDocument(documentId);
+      await deleteDocument(
+        documentId,
+      );
 
       setDocuments((previous) =>
         previous.filter(
-          (item) => item.id !== documentId,
+          (item) =>
+            item.id !==
+            documentId,
         ),
       );
 
       if (
-        selectedDocument?.id === documentId
+        selectedDocument?.id ===
+        documentId
       ) {
         setSelectedDocument(null);
         setChunks([]);
       }
     } catch (requestError) {
-      setError(requestError.message);
+      setError(
+        requestError.message,
+      );
     } finally {
-      setIsLoading(false);
+      setDeletingDocumentId(
+        null,
+      );
     }
   }
 
@@ -213,11 +363,14 @@ function DocumentManager() {
     <section className="document-manager">
       <header className="document-header">
         <div>
-          <h2>Knowledge Documents</h2>
+          <h2>
+            Knowledge Documents
+          </h2>
 
           <p>
-            Upload and split organisation PDFs
-            into searchable chunks.
+            Upload organisation PDFs,
+            create chunks and store
+            semantic vectors in Qdrant.
           </p>
         </div>
       </header>
@@ -237,7 +390,9 @@ function DocumentManager() {
           id="document-upload"
           type="file"
           accept=".pdf,application/pdf"
-          onChange={handleFileChange}
+          onChange={
+            handleFileChange
+          }
           disabled={isUploading}
         />
 
@@ -258,11 +413,12 @@ function DocumentManager() {
         <button
           type="submit"
           disabled={
-            !selectedFile || isUploading
+            !selectedFile ||
+            isUploading
           }
         >
           {isUploading
-            ? "Extracting and chunking..."
+            ? "Extracting, chunking and embedding..."
             : "Upload and process"}
         </button>
       </form>
@@ -275,83 +431,197 @@ function DocumentManager() {
 
       <div className="document-content">
         <div className="document-list">
-          <h3>Uploaded documents</h3>
+          <h3>
+            Uploaded documents
+          </h3>
 
           {isLoading &&
-            documents.length === 0 && (
-              <p>Loading documents...</p>
-            )}
-
-          {!isLoading &&
-            documents.length === 0 && (
-              <p className="empty-document-text">
-                No documents uploaded.
+            documents.length ===
+              0 && (
+              <p>
+                Loading documents...
               </p>
             )}
 
-          {documents.map((item) => (
-            <article
-              key={item.id}
-              className={`document-card ${
-                selectedDocument?.id ===
-                item.id
-                  ? "document-card--active"
-                  : ""
-              }`}
-            >
-              <button
-                type="button"
-                className="document-view-button"
-                onClick={() =>
-                  handleViewDocument(item.id)
-                }
-                disabled={isLoading}
-              >
-                <strong>
-                  {item.originalName}
-                </strong>
+          {!isLoading &&
+            documents.length ===
+              0 && (
+              <p className="empty-document-text">
+                No documents
+                uploaded.
+              </p>
+            )}
 
-                <span>
-                  {item.pageCount} pages
-                </span>
+          {documents.map(
+            (item) => {
+              const embeddingStatus =
+                item.embeddingStatus ||
+                "pending";
 
-                <span>
-                  {item.chunkCount} chunks
-                </span>
+              const isEmbedding =
+                embeddingDocumentId ===
+                item.id;
 
-                <span>
-                  {formatFileSize(
-                    item.fileSize,
-                  )}
-                </span>
+              const isDeleting =
+                deletingDocumentId ===
+                item.id;
 
-                <span>
-                  Status: {item.status}
-                </span>
-              </button>
+              return (
+                <article
+                  key={item.id}
+                  className={`document-card ${
+                    selectedDocument?.id ===
+                    item.id
+                      ? "document-card--active"
+                      : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="document-view-button"
+                    onClick={() =>
+                      handleViewDocument(
+                        item.id,
+                      )
+                    }
+                    disabled={
+                      isLoading ||
+                      isEmbedding ||
+                      isDeleting
+                    }
+                  >
+                    <strong>
+                      {
+                        item.originalName
+                      }
+                    </strong>
 
-              <button
-                type="button"
-                className="document-delete-button"
-                onClick={() =>
-                  handleDeleteDocument(
-                    item.id,
-                  )
-                }
-                disabled={isLoading}
-              >
-                Delete
-              </button>
-            </article>
-          ))}
+                    <span>
+                      {item.pageCount}{" "}
+                      pages
+                    </span>
+
+                    <span>
+                      {item.chunkCount}{" "}
+                      chunks
+                    </span>
+
+                    <span>
+                      {formatFileSize(
+                        item.fileSize,
+                      )}
+                    </span>
+
+                    <span>
+                      Document:{" "}
+                      {item.status}
+                    </span>
+
+                    <span>
+                      Embeddings:{" "}
+                      {embeddingStatus}
+                    </span>
+
+                    <span>
+                      Embedded:{" "}
+                      {item.embeddedChunkCount ||
+                        0}
+                      /{item.chunkCount}
+                    </span>
+
+                    {item.failedChunkCount >
+                      0 && (
+                      <span>
+                        Failed:{" "}
+                        {
+                          item.failedChunkCount
+                        }
+                      </span>
+                    )}
+                  </button>
+
+                  <div className="document-card-actions">
+                    {embeddingStatus !==
+                      "completed" && (
+                      <button
+                        type="button"
+                        className="embedding-button"
+                        onClick={() =>
+                          handleGenerateEmbeddings(
+                            item.id,
+                          )
+                        }
+                        disabled={
+                          isEmbedding ||
+                          isDeleting
+                        }
+                      >
+                        {isEmbedding
+                          ? "Generating..."
+                          : embeddingStatus ===
+                              "partially_failed" ||
+                            embeddingStatus ===
+                              "failed"
+                            ? "Retry embeddings"
+                            : "Generate embeddings"}
+                      </button>
+                    )}
+
+                    {embeddingStatus ===
+                      "completed" && (
+                      <button
+                        type="button"
+                        className="embedding-button"
+                        onClick={() =>
+                          handleGenerateEmbeddings(
+                            item.id,
+                            true,
+                          )
+                        }
+                        disabled={
+                          isEmbedding ||
+                          isDeleting
+                        }
+                      >
+                        {isEmbedding
+                          ? "Regenerating..."
+                          : "Regenerate"}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="document-delete-button"
+                      onClick={() =>
+                        handleDeleteDocument(
+                          item.id,
+                        )
+                      }
+                      disabled={
+                        isDeleting ||
+                        isEmbedding
+                      }
+                    >
+                      {isDeleting
+                        ? "Deleting..."
+                        : "Delete"}
+                    </button>
+                  </div>
+                </article>
+              );
+            },
+          )}
         </div>
 
         <div className="document-preview">
-          <h3>Document preview</h3>
+          <h3>
+            Document preview
+          </h3>
 
           {!selectedDocument && (
             <p className="empty-document-text">
-              Select a document to inspect it.
+              Select a document to
+              inspect it.
             </p>
           )}
 
@@ -365,18 +635,24 @@ function DocumentManager() {
                 </strong>
 
                 <span>
-                  {selectedDocument.pageCount}
-                  {" pages"}
+                  {
+                    selectedDocument.pageCount
+                  }{" "}
+                  pages
                 </span>
 
                 <span>
-                  {selectedDocument.chunkCount}
-                  {" chunks"}
+                  {
+                    selectedDocument.chunkCount
+                  }{" "}
+                  chunks
                 </span>
 
                 <span>
                   Chunk size:{" "}
-                  {selectedDocument.chunkSize}
+                  {
+                    selectedDocument.chunkSize
+                  }
                 </span>
 
                 <span>
@@ -385,18 +661,46 @@ function DocumentManager() {
                     selectedDocument.chunkOverlap
                   }
                 </span>
+
+                <span>
+                  Embeddings:{" "}
+                  {selectedDocument.embeddingStatus ||
+                    "pending"}
+                </span>
+
+                <span>
+                  Model:{" "}
+                  {selectedDocument.embeddingModel ||
+                    "Not generated"}
+                </span>
+
+                <span>
+                  Dimensions:{" "}
+                  {selectedDocument.embeddingDimensions ||
+                    "Not available"}
+                </span>
+
+                <span>
+                  Embedded at:{" "}
+                  {formatDate(
+                    selectedDocument.embeddedAt,
+                  )}
+                </span>
               </div>
 
               <div className="preview-tabs">
                 <button
                   type="button"
                   className={
-                    previewMode === "text"
+                    previewMode ===
+                    "text"
                       ? "preview-tab preview-tab--active"
                       : "preview-tab"
                   }
                   onClick={() =>
-                    setPreviewMode("text")
+                    setPreviewMode(
+                      "text",
+                    )
                   }
                 >
                   Extracted text
@@ -405,19 +709,24 @@ function DocumentManager() {
                 <button
                   type="button"
                   className={
-                    previewMode === "chunks"
+                    previewMode ===
+                    "chunks"
                       ? "preview-tab preview-tab--active"
                       : "preview-tab"
                   }
                   onClick={() =>
-                    setPreviewMode("chunks")
+                    setPreviewMode(
+                      "chunks",
+                    )
                   }
                 >
-                  Chunks ({chunks.length})
+                  Chunks (
+                  {chunks.length})
                 </button>
               </div>
 
-              {previewMode === "text" && (
+              {previewMode ===
+                "text" && (
                 <pre className="extracted-text">
                   {
                     selectedDocument.extractedText
@@ -425,53 +734,97 @@ function DocumentManager() {
                 </pre>
               )}
 
-              {previewMode === "chunks" && (
+              {previewMode ===
+                "chunks" && (
                 <div className="chunk-list">
-                  {chunks.length === 0 && (
+                  {chunks.length ===
+                    0 && (
                     <p>
-                      No chunks found for this
+                      No chunks found
+                      for this
                       document.
                     </p>
                   )}
 
-                  {chunks.map((chunk) => (
-                    <article
-                      key={chunk.id}
-                      className="chunk-card"
-                    >
-                      <div className="chunk-header">
-                        <strong>
-                          Chunk{" "}
-                          {chunk.chunkIndex + 1}
-                        </strong>
+                  {chunks.map(
+                    (chunk) => (
+                      <article
+                        key={chunk.id}
+                        className="chunk-card"
+                      >
+                        <div className="chunk-header">
+                          <strong>
+                            Chunk{" "}
+                            {chunk.chunkIndex +
+                              1}
+                          </strong>
 
-                        <span>
-                          {
-                            chunk.characterCount
-                          }
-                          {" characters"}
-                        </span>
+                          <span>
+                            {
+                              chunk.characterCount
+                            }{" "}
+                            characters
+                          </span>
 
-                        <span>
-                          Position:{" "}
-                          {
-                            chunk.startCharacter
-                          }
-                          {" - "}
-                          {chunk.endCharacter}
-                        </span>
+                          <span>
+                            Position:{" "}
+                            {
+                              chunk.startCharacter
+                            }
+                            {" - "}
+                            {
+                              chunk.endCharacter
+                            }
+                          </span>
 
-                        <span>
-                          Embedding:{" "}
-                          {
-                            chunk.embeddingStatus
-                          }
-                        </span>
-                      </div>
+                          <span>
+                            Embedding:{" "}
+                            {
+                              chunk.embeddingStatus
+                            }
+                          </span>
 
-                      <p>{chunk.content}</p>
-                    </article>
-                  ))}
+                          {chunk.embeddingModel && (
+                            <span>
+                              Model:{" "}
+                              {
+                                chunk.embeddingModel
+                              }
+                            </span>
+                          )}
+
+                          {chunk.embeddingDimensions && (
+                            <span>
+                              Dimensions:{" "}
+                              {
+                                chunk.embeddingDimensions
+                              }
+                            </span>
+                          )}
+
+                          {chunk.qdrantPointId && (
+                            <span>
+                              Vector stored:
+                              Yes
+                            </span>
+                          )}
+                        </div>
+
+                        {chunk.embeddingError && (
+                          <p className="chunk-error">
+                            Error:{" "}
+                            {
+                              chunk.embeddingError
+                            }
+                          </p>
+                        )}
+
+                        <p>
+                          {chunk.content}
+                        </p>
+                      </article>
+                    ),
+                  )}
                 </div>
               )}
             </>

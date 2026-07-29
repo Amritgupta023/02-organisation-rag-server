@@ -1,22 +1,36 @@
 import "dotenv/config";
 import app from "./app.js";
-import { connectDatabase } from "./config/database.js";
+import {connectDatabase} from "./config/database.js";
+import {
+  ensureQdrantCollection,
+} from "./services/qdrant.service.js";
 
-const port = process.env.PORT || 5000;
+const PORT =
+  process.env.PORT || 5000;
 
 async function startServer() {
   try {
     await connectDatabase();
 
-    app.listen(port, () => {
+    console.log(
+      "MongoDB connected successfully",
+    );
+
+    await ensureQdrantCollection();
+
+    console.log(
+      "Qdrant connected successfully",
+    );
+
+    app.listen(PORT, () => {
       console.log(
-        `Server running at http://localhost:${port}`,
+        `Server running on http://localhost:${PORT}`,
       );
     });
   } catch (error) {
     console.error(
       "Unable to start server:",
-      error.message,
+      error,
     );
 
     process.exit(1);

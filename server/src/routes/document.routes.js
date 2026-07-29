@@ -5,7 +5,9 @@ import {
   getDocumentsController,
   uploadDocumentController,
 } from "../controllers/document.controller.js";
-import { uploadSinglePdf } from "../middlewares/upload.middleware.js";
+import {
+  uploadSinglePdf,
+} from "../middlewares/upload.middleware.js";
 
 const router = express.Router();
 
@@ -15,7 +17,10 @@ router.post(
   uploadDocumentController,
 );
 
-router.get("/", getDocumentsController);
+router.get(
+  "/",
+  getDocumentsController,
+);
 
 router.get(
   "/:documentId",

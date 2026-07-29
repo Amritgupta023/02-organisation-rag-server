@@ -73,6 +73,46 @@ const documentSchema = new mongoose.Schema(
       default: null,
     },
 
+    embeddingStatus: {
+      type: String,
+      enum: [
+        "pending",
+        "processing",
+        "completed",
+        "partially_failed",
+        "failed",
+      ],
+      default: "pending",
+      index: true,
+    },
+
+    embeddedChunkCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    failedChunkCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    embeddingModel: {
+      type: String,
+      default: null,
+    },
+
+    embeddingDimensions: {
+      type: Number,
+      default: null,
+    },
+
+    embeddedAt: {
+      type: Date,
+      default: null,
+    },
+
     sourceType: {
       type: String,
       enum: ["pdf"],

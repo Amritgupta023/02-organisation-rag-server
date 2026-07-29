@@ -8,10 +8,13 @@ export async function getDocumentChunksController(
   res,
 ) {
   try {
-    const { documentId } = req.params;
+    const { documentId } =
+      req.params;
 
     const document =
-      await getDocumentById(documentId);
+      await getDocumentById(
+        documentId,
+      );
 
     if (!document) {
       return res.status(404).json({
@@ -25,24 +28,56 @@ export async function getDocumentChunksController(
         documentId,
       );
 
-    const formattedChunks = chunks.map(
-      (chunk) => ({
+    const formattedChunks =
+      chunks.map((chunk) => ({
         id: chunk._id,
-        documentId: chunk.documentId,
-        chunkIndex: chunk.chunkIndex,
-        content: chunk.content,
+
+        documentId:
+          chunk.documentId,
+
+        chunkIndex:
+          chunk.chunkIndex,
+
+        content:
+          chunk.content,
+
         characterCount:
           chunk.characterCount,
+
         startCharacter:
           chunk.startCharacter,
+
         endCharacter:
           chunk.endCharacter,
-        metadata: chunk.metadata,
+
+        metadata:
+          chunk.metadata,
+
         embeddingStatus:
-          chunk.embeddingStatus,
-        createdAt: chunk.createdAt,
-      }),
-    );
+          chunk.embeddingStatus ||
+          "pending",
+
+        embeddingModel:
+          chunk.embeddingModel,
+
+        embeddingDimensions:
+          chunk.embeddingDimensions,
+
+        qdrantPointId:
+          chunk.qdrantPointId,
+
+        embeddedAt:
+          chunk.embeddedAt,
+
+        embeddingError:
+          chunk.embeddingError,
+
+        createdAt:
+          chunk.createdAt,
+
+        updatedAt:
+          chunk.updatedAt,
+      }));
 
     return res.status(200).json({
       success: true,
@@ -50,14 +85,36 @@ export async function getDocumentChunksController(
       data: {
         document: {
           id: document._id,
+
           originalName:
             document.originalName,
+
           chunkCount:
             document.chunkCount,
+
           chunkSize:
             document.chunkSize,
+
           chunkOverlap:
             document.chunkOverlap,
+
+          embeddingStatus:
+            document.embeddingStatus ||
+            "pending",
+
+          embeddedChunkCount:
+            document.embeddedChunkCount ||
+            0,
+
+          failedChunkCount:
+            document.failedChunkCount ||
+            0,
+
+          embeddingModel:
+            document.embeddingModel,
+
+          embeddingDimensions:
+            document.embeddingDimensions,
         },
 
         chunks: formattedChunks,
@@ -71,6 +128,7 @@ export async function getDocumentChunksController(
 
     return res.status(500).json({
       success: false,
+
       message:
         "Unable to load document chunks",
     });

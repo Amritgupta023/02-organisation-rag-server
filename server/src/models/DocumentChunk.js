@@ -58,18 +58,41 @@ const documentChunkSchema =
         },
       },
 
-      /*
-       * Level 7 ke liye placeholder.
-       * Abhi false hi rahega.
-       */
       embeddingStatus: {
         type: String,
         enum: [
           "pending",
+          "processing",
           "completed",
           "failed",
         ],
         default: "pending",
+        index: true,
+      },
+
+      embeddingModel: {
+        type: String,
+        default: null,
+      },
+
+      embeddingDimensions: {
+        type: Number,
+        default: null,
+      },
+
+      qdrantPointId: {
+        type: String,
+        default: null,
+      },
+
+      embeddedAt: {
+        type: Date,
+        default: null,
+      },
+
+      embeddingError: {
+        type: String,
+        default: null,
       },
     },
     {
@@ -88,6 +111,7 @@ documentChunkSchema.index(
 );
 
 documentChunkSchema.index({
+  documentId: 1,
   embeddingStatus: 1,
 });
 

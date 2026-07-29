@@ -11,6 +11,9 @@ import {
 } from "../services/document.service.js";
 import { extractTextFromPdf } from "../services/pdf.service.js";
 import { splitTextIntoChunks } from "../services/chunk.service.js";
+import {
+  embedDocumentChunks,
+} from "../services/document-embedding.service.js";
 
 function createTextPreview(text) {
   if (
@@ -26,6 +29,70 @@ function createTextPreview(text) {
   )}...`;
 }
 
+function formatDocumentSummary(document) {
+  return {
+    id: document._id,
+
+    originalName:
+      document.originalName,
+
+    mimeType:
+      document.mimeType,
+
+    fileSize:
+      document.fileSize,
+
+    pageCount:
+      document.pageCount,
+
+    characterCount:
+      document.characterCount,
+
+    chunkCount:
+      document.chunkCount,
+
+    chunkSize:
+      document.chunkSize,
+
+    chunkOverlap:
+      document.chunkOverlap,
+
+    status:
+      document.status,
+
+    processingError:
+      document.processingError,
+
+    embeddingStatus:
+      document.embeddingStatus ||
+      "pending",
+
+    embeddedChunkCount:
+      document.embeddedChunkCount || 0,
+
+    failedChunkCount:
+      document.failedChunkCount || 0,
+
+    embeddingModel:
+      document.embeddingModel,
+
+    embeddingDimensions:
+      document.embeddingDimensions,
+
+    embeddedAt:
+      document.embeddedAt,
+
+    sourceType:
+      document.sourceType,
+
+    createdAt:
+      document.createdAt,
+
+    updatedAt:
+      document.updatedAt,
+  };
+}
+
 export async function uploadDocumentController(
   req,
   res,
@@ -36,7 +103,8 @@ export async function uploadDocumentController(
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "PDF document is required",
+        message:
+          "PDF document is required",
       });
     }
 
@@ -49,17 +117,27 @@ export async function uploadDocumentController(
       await createDocument({
         originalName:
           req.file.originalname,
-        mimeType: req.file.mimetype,
-        fileSize: req.file.size,
-        pageCount: pdfResult.pageCount,
-        extractedText: pdfResult.text,
+
+        mimeType:
+          req.file.mimetype,
+
+        fileSize:
+          req.file.size,
+
+        pageCount:
+          pdfResult.pageCount,
+
+        extractedText:
+          pdfResult.text,
+
         characterCount:
           pdfResult.characterCount,
       });
 
-    const chunks = splitTextIntoChunks(
-      pdfResult.text,
-    );
+    const chunks =
+      splitTextIntoChunks(
+        pdfResult.text,
+      );
 
     if (!chunks.length) {
       const error = new Error(
@@ -67,53 +145,58 @@ export async function uploadDocumentController(
       );
 
       error.statusCode = 422;
+
       throw error;
     }
 
     await createDocumentChunks({
-      documentId: createdDocument._id,
+      documentId:
+        createdDocument._id,
+
       originalName:
         createdDocument.originalName,
+
       chunks,
     });
 
     const processedDocument =
       await markDocumentProcessed({
-        documentId: createdDocument._id,
-        chunkCount: chunks.length,
+        documentId:
+          createdDocument._id,
+
+        chunkCount:
+          chunks.length,
       });
+
+    /*
+     * Level 7:
+     * Chunking ke baad embeddings automatically
+     * generate ho kar Qdrant mein save hongi.
+     */
+    const embeddingResult =
+      await embedDocumentChunks(
+        processedDocument._id,
+      );
+
+    const finalDocument =
+      await getDocumentById(
+        processedDocument._id,
+      );
 
     return res.status(201).json({
       success: true,
 
       data: {
-        id: processedDocument._id,
-        originalName:
-          processedDocument.originalName,
-        mimeType:
-          processedDocument.mimeType,
-        fileSize:
-          processedDocument.fileSize,
-        pageCount:
-          processedDocument.pageCount,
-        characterCount:
-          processedDocument.characterCount,
-        chunkCount:
-          processedDocument.chunkCount,
-        chunkSize:
-          processedDocument.chunkSize,
-        chunkOverlap:
-          processedDocument.chunkOverlap,
-        status:
-          processedDocument.status,
-        sourceType:
-          processedDocument.sourceType,
+        ...formatDocumentSummary(
+          finalDocument,
+        ),
+
         textPreview:
           createTextPreview(
-            processedDocument.extractedText,
+            finalDocument.extractedText,
           ),
-        createdAt:
-          processedDocument.createdAt,
+
+        embeddingResult,
       },
     });
   } catch (error) {
@@ -131,7 +214,9 @@ export async function uploadDocumentController(
         await markDocumentFailed({
           documentId:
             createdDocument._id,
-          errorMessage: error.message,
+
+          errorMessage:
+            error.message,
         });
       } catch (cleanupError) {
         console.error(
@@ -168,32 +253,12 @@ export async function getDocumentsController(
     const documents =
       await getAllDocuments();
 
-    const documentSummaries =
-      documents.map((document) => ({
-        id: document._id,
-        originalName:
-          document.originalName,
-        mimeType: document.mimeType,
-        fileSize: document.fileSize,
-        pageCount: document.pageCount,
-        characterCount:
-          document.characterCount,
-        chunkCount: document.chunkCount,
-        chunkSize: document.chunkSize,
-        chunkOverlap:
-          document.chunkOverlap,
-        status: document.status,
-        processingError:
-          document.processingError,
-        sourceType:
-          document.sourceType,
-        createdAt: document.createdAt,
-        updatedAt: document.updatedAt,
-      }));
-
     return res.status(200).json({
       success: true,
-      data: documentSummaries,
+
+      data: documents.map(
+        formatDocumentSummary,
+      ),
     });
   } catch (error) {
     console.error(
@@ -203,7 +268,8 @@ export async function getDocumentsController(
 
     return res.status(500).json({
       success: false,
-      message: "Unable to load documents",
+      message:
+        "Unable to load documents",
     });
   }
 }
@@ -213,10 +279,13 @@ export async function getDocumentController(
   res,
 ) {
   try {
-    const { documentId } = req.params;
+    const { documentId } =
+      req.params;
 
     const document =
-      await getDocumentById(documentId);
+      await getDocumentById(
+        documentId,
+      );
 
     if (!document) {
       return res.status(404).json({
@@ -229,27 +298,12 @@ export async function getDocumentController(
       success: true,
 
       data: {
-        id: document._id,
-        originalName:
-          document.originalName,
-        mimeType: document.mimeType,
-        fileSize: document.fileSize,
-        pageCount: document.pageCount,
-        characterCount:
-          document.characterCount,
-        chunkCount: document.chunkCount,
-        chunkSize: document.chunkSize,
-        chunkOverlap:
-          document.chunkOverlap,
+        ...formatDocumentSummary(
+          document,
+        ),
+
         extractedText:
           document.extractedText,
-        status: document.status,
-        processingError:
-          document.processingError,
-        sourceType:
-          document.sourceType,
-        createdAt: document.createdAt,
-        updatedAt: document.updatedAt,
       },
     });
   } catch (error) {
@@ -260,7 +314,8 @@ export async function getDocumentController(
 
     return res.status(500).json({
       success: false,
-      message: "Unable to load document",
+      message:
+        "Unable to load document",
     });
   }
 }
@@ -270,10 +325,13 @@ export async function deleteDocumentController(
   res,
 ) {
   try {
-    const { documentId } = req.params;
+    const { documentId } =
+      req.params;
 
     const deletedDocument =
-      await deleteDocumentById(documentId);
+      await deleteDocumentById(
+        documentId,
+      );
 
     if (!deletedDocument) {
       return res.status(404).json({
@@ -284,8 +342,9 @@ export async function deleteDocumentController(
 
     return res.status(200).json({
       success: true,
+
       message:
-        "Document and its chunks deleted successfully",
+        "Document, chunks and vectors deleted successfully",
     });
   } catch (error) {
     console.error(
@@ -295,7 +354,10 @@ export async function deleteDocumentController(
 
     return res.status(500).json({
       success: false,
-      message: "Unable to delete document",
+
+      message:
+        error.message ||
+        "Unable to delete document",
     });
   }
 }

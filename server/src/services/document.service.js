@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 import { CHUNK_CONFIG } from "../config/chunk.config.js";
 import Document from "../models/Document.js";
 import DocumentChunk from "../models/DocumentChunk.js";
+import {
+  deleteDocumentVectors,
+} from "./qdrant.service.js";
 
 export function isValidDocumentId(documentId) {
   return mongoose.Types.ObjectId.isValid(
@@ -24,12 +27,24 @@ export async function createDocument({
     pageCount,
     extractedText,
     characterCount,
+
     chunkCount: 0,
-    chunkSize: CHUNK_CONFIG.CHUNK_SIZE,
+
+    chunkSize:
+      CHUNK_CONFIG.CHUNK_SIZE,
+
     chunkOverlap:
       CHUNK_CONFIG.CHUNK_OVERLAP,
+
     sourceType: "pdf",
+
     status: "processing",
+
+    embeddingStatus: "pending",
+
+    embeddedChunkCount: 0,
+
+    failedChunkCount: 0,
   });
 }
 
@@ -45,26 +60,39 @@ export async function createDocumentChunks({
   const chunkDocuments = chunks.map(
     (chunk) => ({
       documentId,
-      chunkIndex: chunk.chunkIndex,
-      content: chunk.content,
+
+      chunkIndex:
+        chunk.chunkIndex,
+
+      content:
+        chunk.content,
+
       characterCount:
         chunk.characterCount,
+
       startCharacter:
         chunk.startCharacter,
-      endCharacter: chunk.endCharacter,
+
+      endCharacter:
+        chunk.endCharacter,
 
       metadata: {
         originalName,
         sourceType: "pdf",
-
-        /*
-         * Current pdf parser se exact page mapping
-         * preserve nahi ho rahi, isliye null.
-         */
         pageNumber: null,
       },
 
       embeddingStatus: "pending",
+
+      embeddingModel: null,
+
+      embeddingDimensions: null,
+
+      qdrantPointId: null,
+
+      embeddedAt: null,
+
+      embeddingError: null,
     }),
   );
 
@@ -85,8 +113,12 @@ export async function markDocumentProcessed({
     {
       $set: {
         status: "processed",
+
         chunkCount,
+
         processingError: null,
+
+        embeddingStatus: "pending",
       },
     },
     {
@@ -105,7 +137,11 @@ export async function markDocumentFailed({
     {
       $set: {
         status: "failed",
-        processingError: errorMessage,
+
+        processingError:
+          errorMessage,
+
+        embeddingStatus: "failed",
       },
     },
     {
@@ -129,6 +165,12 @@ export async function getAllDocuments() {
         "chunkOverlap",
         "status",
         "processingError",
+        "embeddingStatus",
+        "embeddedChunkCount",
+        "failedChunkCount",
+        "embeddingModel",
+        "embeddingDimensions",
+        "embeddedAt",
         "sourceType",
         "createdAt",
         "updatedAt",
@@ -147,7 +189,9 @@ export async function getDocumentById(
     return null;
   }
 
-  return Document.findById(documentId).lean();
+  return Document.findById(
+    documentId,
+  ).lean();
 }
 
 export async function getChunksByDocumentId(
@@ -194,13 +238,28 @@ export async function deleteDocumentById(
     return null;
   }
 
-  /*
-   * Pehle related chunks delete karenge,
-   * uske baad parent document.
-   */
-  await deleteChunksByDocumentId(
+  try {
+    await deleteDocumentVectors(
+      documentId,
+    );
+  } catch (error) {
+    console.error(
+      "Unable to delete Qdrant vectors:",
+      error.message,
+    );
+
+    /*
+     * MongoDB records ko delete nahi karenge
+     * agar vector cleanup fail ho jaye.
+     */
+    throw new Error(
+      "Unable to delete document vectors from Qdrant",
+    );
+  }
+
+  await DocumentChunk.deleteMany({
     documentId,
-  );
+  });
 
   await document.deleteOne();
 

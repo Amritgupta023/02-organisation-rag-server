@@ -4,13 +4,32 @@ import chatRoutes from "./routes/chat.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import documentRoutes from "./routes/document.routes.js";
 import documentChunkRoutes from "./routes/document-chunk.routes.js";
-import { errorMiddleware } from "./middlewares/error.middleware.js";
+import documentEmbeddingRoutes from "./routes/document-embedding.routes.js";
+import {
+  errorMiddleware,
+} from "./middlewares/error.middleware.js";
 
 const app = express();
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin:
+      process.env.CLIENT_URL ||
+      "http://localhost:5173",
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
   }),
 );
 
@@ -20,15 +39,29 @@ app.use(
   }),
 );
 
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message:
-      "Organisation RAG server is running",
-  });
-});
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "1mb",
+  }),
+);
 
-app.use("/api/chat", chatRoutes);
+app.get(
+  "/api/health",
+  (req, res) => {
+    res.status(200).json({
+      success: true,
+
+      message:
+        "Organisation RAG server is running",
+    });
+  },
+);
+
+app.use(
+  "/api/chat",
+  chatRoutes,
+);
 
 app.use(
   "/api/conversations",
@@ -40,11 +73,15 @@ app.use(
   documentRoutes,
 );
 
-/*
- * Route already /api/documents/:id/chunks
- * define karti hai.
- */
-app.use("/api", documentChunkRoutes);
+app.use(
+  "/api",
+  documentChunkRoutes,
+);
+
+app.use(
+  "/api",
+  documentEmbeddingRoutes,
+);
 
 app.use((req, res) => {
   res.status(404).json({
