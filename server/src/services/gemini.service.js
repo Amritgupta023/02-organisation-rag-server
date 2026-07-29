@@ -26,6 +26,7 @@ export async function generateGeminiResponse({
     message,
   );
 
+  console.log('************************************\n*********gemini content****************\n',contents,'\n***************************\n')
   const response = await ai.models.generateContent({
     model: AI_CONFIG.MODEL,
 

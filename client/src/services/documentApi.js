@@ -13,9 +13,7 @@ async function parseResponse(response) {
   return result.data;
 }
 
-export async function uploadDocument(
-  file,
-) {
+export async function uploadDocument(file) {
   const formData = new FormData();
 
   formData.append("document", file);
@@ -49,6 +47,16 @@ export async function getDocument(
   return parseResponse(response);
 }
 
+export async function getDocumentChunks(
+  documentId,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/documents/${documentId}/chunks`,
+  );
+
+  return parseResponse(response);
+}
+
 export async function deleteDocument(
   documentId,
 ) {
@@ -59,12 +67,14 @@ export async function deleteDocument(
     },
   );
 
-  if (!response.ok) {
-    const result = await response.json();
+  const result = await response.json();
 
+  if (!response.ok) {
     throw new Error(
       result.message ||
         "Unable to delete document",
     );
   }
+
+  return result;
 }

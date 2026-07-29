@@ -1,11 +1,16 @@
 import { UPLOAD_CONFIG } from "../config/upload.config.js";
 import {
   createDocument,
+  createDocumentChunks,
+  deleteChunksByDocumentId,
   deleteDocumentById,
   getAllDocuments,
   getDocumentById,
+  markDocumentFailed,
+  markDocumentProcessed,
 } from "../services/document.service.js";
 import { extractTextFromPdf } from "../services/pdf.service.js";
+import { splitTextIntoChunks } from "../services/chunk.service.js";
 
 function createTextPreview(text) {
   if (
@@ -25,6 +30,8 @@ export async function uploadDocumentController(
   req,
   res,
 ) {
+  let createdDocument = null;
+
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -38,33 +45,75 @@ export async function uploadDocumentController(
         req.file.buffer,
       );
 
-    const document = await createDocument({
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      fileSize: req.file.size,
-      pageCount: pdfResult.pageCount,
-      extractedText: pdfResult.text,
-      characterCount:
-        pdfResult.characterCount,
+    createdDocument =
+      await createDocument({
+        originalName:
+          req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        pageCount: pdfResult.pageCount,
+        extractedText: pdfResult.text,
+        characterCount:
+          pdfResult.characterCount,
+      });
+
+    const chunks = splitTextIntoChunks(
+      pdfResult.text,
+    );
+
+    if (!chunks.length) {
+      const error = new Error(
+        "Unable to create chunks from the document",
+      );
+
+      error.statusCode = 422;
+      throw error;
+    }
+
+    await createDocumentChunks({
+      documentId: createdDocument._id,
+      originalName:
+        createdDocument.originalName,
+      chunks,
     });
+
+    const processedDocument =
+      await markDocumentProcessed({
+        documentId: createdDocument._id,
+        chunkCount: chunks.length,
+      });
 
     return res.status(201).json({
       success: true,
 
       data: {
-        id: document._id,
-        originalName: document.originalName,
-        mimeType: document.mimeType,
-        fileSize: document.fileSize,
-        pageCount: document.pageCount,
+        id: processedDocument._id,
+        originalName:
+          processedDocument.originalName,
+        mimeType:
+          processedDocument.mimeType,
+        fileSize:
+          processedDocument.fileSize,
+        pageCount:
+          processedDocument.pageCount,
         characterCount:
-          document.characterCount,
-        status: document.status,
-        sourceType: document.sourceType,
-        textPreview: createTextPreview(
-          document.extractedText,
-        ),
-        createdAt: document.createdAt,
+          processedDocument.characterCount,
+        chunkCount:
+          processedDocument.chunkCount,
+        chunkSize:
+          processedDocument.chunkSize,
+        chunkOverlap:
+          processedDocument.chunkOverlap,
+        status:
+          processedDocument.status,
+        sourceType:
+          processedDocument.sourceType,
+        textPreview:
+          createTextPreview(
+            processedDocument.extractedText,
+          ),
+        createdAt:
+          processedDocument.createdAt,
       },
     });
   } catch (error) {
@@ -73,14 +122,35 @@ export async function uploadDocumentController(
       error,
     );
 
+    if (createdDocument?._id) {
+      try {
+        await deleteChunksByDocumentId(
+          createdDocument._id,
+        );
+
+        await markDocumentFailed({
+          documentId:
+            createdDocument._id,
+          errorMessage: error.message,
+        });
+      } catch (cleanupError) {
+        console.error(
+          "Document cleanup error:",
+          cleanupError,
+        );
+      }
+    }
+
     return res
       .status(error.statusCode || 500)
       .json({
         success: false,
+
         message:
           error.statusCode
             ? error.message
             : "Unable to process PDF document",
+
         error:
           process.env.NODE_ENV ===
           "development"
@@ -98,21 +168,28 @@ export async function getDocumentsController(
     const documents =
       await getAllDocuments();
 
-    const documentSummaries = documents.map(
-      (document) => ({
+    const documentSummaries =
+      documents.map((document) => ({
         id: document._id,
-        originalName: document.originalName,
+        originalName:
+          document.originalName,
         mimeType: document.mimeType,
         fileSize: document.fileSize,
         pageCount: document.pageCount,
         characterCount:
           document.characterCount,
+        chunkCount: document.chunkCount,
+        chunkSize: document.chunkSize,
+        chunkOverlap:
+          document.chunkOverlap,
         status: document.status,
-        sourceType: document.sourceType,
+        processingError:
+          document.processingError,
+        sourceType:
+          document.sourceType,
         createdAt: document.createdAt,
         updatedAt: document.updatedAt,
-      }),
-    );
+      }));
 
     return res.status(200).json({
       success: true,
@@ -153,16 +230,24 @@ export async function getDocumentController(
 
       data: {
         id: document._id,
-        originalName: document.originalName,
+        originalName:
+          document.originalName,
         mimeType: document.mimeType,
         fileSize: document.fileSize,
         pageCount: document.pageCount,
         characterCount:
           document.characterCount,
+        chunkCount: document.chunkCount,
+        chunkSize: document.chunkSize,
+        chunkOverlap:
+          document.chunkOverlap,
         extractedText:
           document.extractedText,
         status: document.status,
-        sourceType: document.sourceType,
+        processingError:
+          document.processingError,
+        sourceType:
+          document.sourceType,
         createdAt: document.createdAt,
         updatedAt: document.updatedAt,
       },
@@ -200,7 +285,7 @@ export async function deleteDocumentController(
     return res.status(200).json({
       success: true,
       message:
-        "Document deleted successfully",
+        "Document and its chunks deleted successfully",
     });
   } catch (error) {
     console.error(

@@ -39,10 +39,32 @@ const documentSchema = new mongoose.Schema(
       min: 0,
     },
 
+    chunkCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    chunkSize: {
+      type: Number,
+      default: null,
+      min: 1,
+    },
+
+    chunkOverlap: {
+      type: Number,
+      default: null,
+      min: 0,
+    },
+
     status: {
       type: String,
-      enum: ["processed", "failed"],
-      default: "processed",
+      enum: [
+        "processing",
+        "processed",
+        "failed",
+      ],
+      default: "processing",
       required: true,
     },
 
@@ -69,6 +91,10 @@ documentSchema.index({
 
 documentSchema.index({
   originalName: 1,
+});
+
+documentSchema.index({
+  status: 1,
 });
 
 const Document = mongoose.model(

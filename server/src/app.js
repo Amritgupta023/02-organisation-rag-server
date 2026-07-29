@@ -3,6 +3,7 @@ import express from "express";
 import chatRoutes from "./routes/chat.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import documentRoutes from "./routes/document.routes.js";
+import documentChunkRoutes from "./routes/document-chunk.routes.js";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 
 const app = express();
@@ -38,6 +39,12 @@ app.use(
   "/api/documents",
   documentRoutes,
 );
+
+/*
+ * Route already /api/documents/:id/chunks
+ * define karti hai.
+ */
+app.use("/api", documentChunkRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   deleteDocument,
   getDocument,
+  getDocumentChunks,
   getDocuments,
   uploadDocument,
 } from "../services/documentApi";
@@ -32,8 +33,15 @@ function DocumentManager() {
   const [documents, setDocuments] =
     useState([]);
 
-  const [selectedDocument, setSelectedDocument] =
-    useState(null);
+  const [
+    selectedDocument,
+    setSelectedDocument,
+  ] = useState(null);
+
+  const [chunks, setChunks] = useState([]);
+
+  const [previewMode, setPreviewMode] =
+    useState("text");
 
   const [isLoading, setIsLoading] =
     useState(false);
@@ -55,7 +63,6 @@ function DocumentManager() {
     async function initializeDocuments() {
       try {
         setIsLoading(true);
-
         await loadDocuments();
       } catch (requestError) {
         setError(requestError.message);
@@ -86,20 +93,36 @@ function DocumentManager() {
     if (
       !file.name.toLowerCase().endsWith(".pdf")
     ) {
-      setError("File must have a .pdf extension");
+      setError(
+        "File must have a .pdf extension",
+      );
+
       event.target.value = "";
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      setError(
-        "PDF cannot exceed 5 MB",
-      );
+      setError("PDF cannot exceed 5 MB");
       event.target.value = "";
       return;
     }
 
     setSelectedFile(file);
+  }
+
+  async function loadDocumentDetails(
+    documentId,
+  ) {
+    const [
+      documentResult,
+      chunkResult,
+    ] = await Promise.all([
+      getDocument(documentId),
+      getDocumentChunks(documentId),
+    ]);
+
+    setSelectedDocument(documentResult);
+    setChunks(chunkResult.chunks);
   }
 
   async function handleUpload(event) {
@@ -129,12 +152,11 @@ function DocumentManager() {
 
       await loadDocuments();
 
-      const fullDocument =
-        await getDocument(
-          uploadedDocument.id,
-        );
+      await loadDocumentDetails(
+        uploadedDocument.id,
+      );
 
-      setSelectedDocument(fullDocument);
+      setPreviewMode("chunks");
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -149,10 +171,9 @@ function DocumentManager() {
       setIsLoading(true);
       setError("");
 
-      const document =
-        await getDocument(documentId);
-
-      setSelectedDocument(document);
+      await loadDocumentDetails(
+        documentId,
+      );
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -179,6 +200,7 @@ function DocumentManager() {
         selectedDocument?.id === documentId
       ) {
         setSelectedDocument(null);
+        setChunks([]);
       }
     } catch (requestError) {
       setError(requestError.message);
@@ -194,7 +216,8 @@ function DocumentManager() {
           <h2>Knowledge Documents</h2>
 
           <p>
-            Upload organisation PDF documents.
+            Upload and split organisation PDFs
+            into searchable chunks.
           </p>
         </div>
       </header>
@@ -239,8 +262,8 @@ function DocumentManager() {
           }
         >
           {isUploading
-            ? "Processing PDF..."
-            : "Upload and extract text"}
+            ? "Extracting and chunking..."
+            : "Upload and process"}
         </button>
       </form>
 
@@ -293,14 +316,17 @@ function DocumentManager() {
                 </span>
 
                 <span>
+                  {item.chunkCount} chunks
+                </span>
+
+                <span>
                   {formatFileSize(
                     item.fileSize,
                   )}
                 </span>
 
                 <span>
-                  {item.characterCount.toLocaleString()}
-                  {" characters"}
+                  Status: {item.status}
                 </span>
               </button>
 
@@ -313,7 +339,6 @@ function DocumentManager() {
                   )
                 }
                 disabled={isLoading}
-                aria-label={`Delete ${item.originalName}`}
               >
                 Delete
               </button>
@@ -322,12 +347,11 @@ function DocumentManager() {
         </div>
 
         <div className="document-preview">
-          <h3>Extracted text preview</h3>
+          <h3>Document preview</h3>
 
           {!selectedDocument && (
             <p className="empty-document-text">
-              Select a document to inspect its
-              extracted text.
+              Select a document to inspect it.
             </p>
           )}
 
@@ -346,16 +370,110 @@ function DocumentManager() {
                 </span>
 
                 <span>
-                  {selectedDocument.characterCount.toLocaleString()}
-                  {" characters"}
+                  {selectedDocument.chunkCount}
+                  {" chunks"}
+                </span>
+
+                <span>
+                  Chunk size:{" "}
+                  {selectedDocument.chunkSize}
+                </span>
+
+                <span>
+                  Overlap:{" "}
+                  {
+                    selectedDocument.chunkOverlap
+                  }
                 </span>
               </div>
 
-              <pre className="extracted-text">
-                {
-                  selectedDocument.extractedText
-                }
-              </pre>
+              <div className="preview-tabs">
+                <button
+                  type="button"
+                  className={
+                    previewMode === "text"
+                      ? "preview-tab preview-tab--active"
+                      : "preview-tab"
+                  }
+                  onClick={() =>
+                    setPreviewMode("text")
+                  }
+                >
+                  Extracted text
+                </button>
+
+                <button
+                  type="button"
+                  className={
+                    previewMode === "chunks"
+                      ? "preview-tab preview-tab--active"
+                      : "preview-tab"
+                  }
+                  onClick={() =>
+                    setPreviewMode("chunks")
+                  }
+                >
+                  Chunks ({chunks.length})
+                </button>
+              </div>
+
+              {previewMode === "text" && (
+                <pre className="extracted-text">
+                  {
+                    selectedDocument.extractedText
+                  }
+                </pre>
+              )}
+
+              {previewMode === "chunks" && (
+                <div className="chunk-list">
+                  {chunks.length === 0 && (
+                    <p>
+                      No chunks found for this
+                      document.
+                    </p>
+                  )}
+
+                  {chunks.map((chunk) => (
+                    <article
+                      key={chunk.id}
+                      className="chunk-card"
+                    >
+                      <div className="chunk-header">
+                        <strong>
+                          Chunk{" "}
+                          {chunk.chunkIndex + 1}
+                        </strong>
+
+                        <span>
+                          {
+                            chunk.characterCount
+                          }
+                          {" characters"}
+                        </span>
+
+                        <span>
+                          Position:{" "}
+                          {
+                            chunk.startCharacter
+                          }
+                          {" - "}
+                          {chunk.endCharacter}
+                        </span>
+
+                        <span>
+                          Embedding:{" "}
+                          {
+                            chunk.embeddingStatus
+                          }
+                        </span>
+                      </div>
+
+                      <p>{chunk.content}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
