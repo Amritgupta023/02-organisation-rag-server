@@ -631,7 +631,8 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  flex: 0 0 auto;
+  width: 34px;
   min-height: 34px;
   padding: 7px 10px;
   border-radius: 7px;
@@ -640,7 +641,6 @@ button:disabled {
 }
 
 .embedding-button {
-  flex: 1;
   color: #292929;
   background: #f3f4f6;
   border: 1px solid #e5e7eb;
@@ -722,13 +722,17 @@ button:disabled {
 }
 
 .chunk-card {
-  padding: 16px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
+  overflow: hidden;
 }
 
-.chunk-card p {
+.chunk-content {
+  padding: 0 16px 16px;
+}
+
+.chunk-content p {
   margin: 12px 0 0;
   color: #1f2937;
   line-height: 1.6;
@@ -738,9 +742,20 @@ button:disabled {
 .chunk-header {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px 14px;
-  padding-bottom: 10px;
+  padding: 14px 16px 10px;
   border-bottom: 1px solid #e5e7eb;
+  cursor: pointer;
+}
+
+.chunk-header:hover {
+  background: #f3f4f6;
+}
+
+.chunk-card:not([open]) .chunk-header {
+  padding-bottom: 14px;
+  border-bottom: 0;
 }
 
 .chunk-header span {

@@ -507,6 +507,22 @@ function DocumentManager() {
                       <button
                         type="button"
                         className="embedding-button"
+                        aria-label={
+                          embeddingStatus ===
+                            "partially_failed" ||
+                          embeddingStatus ===
+                            "failed"
+                            ? "Retry embeddings"
+                            : "Generate embeddings"
+                        }
+                        title={
+                          embeddingStatus ===
+                            "partially_failed" ||
+                          embeddingStatus ===
+                            "failed"
+                            ? "Retry embeddings"
+                            : "Generate embeddings"
+                        }
                         onClick={() =>
                           handleGenerateEmbeddings(
                             item.id,
@@ -522,14 +538,6 @@ function DocumentManager() {
                           weight="bold"
                           aria-hidden="true"
                         />
-                        {isEmbedding
-                          ? "Generating..."
-                          : embeddingStatus ===
-                              "partially_failed" ||
-                            embeddingStatus ===
-                              "failed"
-                            ? "Retry embeddings"
-                            : "Generate embeddings"}
                       </button>
                     )}
 
@@ -538,6 +546,8 @@ function DocumentManager() {
                       <button
                         type="button"
                         className="embedding-button"
+                        aria-label="Regenerate embeddings"
+                        title="Regenerate embeddings"
                         onClick={() =>
                           handleGenerateEmbeddings(
                             item.id,
@@ -554,15 +564,14 @@ function DocumentManager() {
                           weight="bold"
                           aria-hidden="true"
                         />
-                        {isEmbedding
-                          ? "Regenerating..."
-                          : "Regenerate"}
                       </button>
                     )}
 
                     <button
                       type="button"
                       className="document-delete-button"
+                      aria-label={`Delete ${item.originalName}`}
+                      title="Delete document"
                       onClick={() =>
                         handleDeleteDocument(
                           item.id,
@@ -578,9 +587,6 @@ function DocumentManager() {
                         weight="bold"
                         aria-hidden="true"
                       />
-                      {isDeleting
-                        ? "Deleting..."
-                        : "Delete"}
                     </button>
                   </div>
                 </article>
@@ -724,11 +730,11 @@ function DocumentManager() {
 
                   {chunks.map(
                     (chunk) => (
-                      <article
+                      <details
                         key={chunk.id}
                         className="chunk-card"
                       >
-                        <div className="chunk-header">
+                        <summary className="chunk-header">
                           <strong>
                             Chunk{" "}
                             {chunk.chunkIndex +
@@ -784,21 +790,23 @@ function DocumentManager() {
                               Yes
                             </span>
                           )}
-                        </div>
+                        </summary>
 
-                        {chunk.embeddingError && (
-                          <p className="chunk-error">
-                            Error:{" "}
-                            {
-                              chunk.embeddingError
-                            }
+                        <div className="chunk-content">
+                          {chunk.embeddingError && (
+                            <p className="chunk-error">
+                              Error:{" "}
+                              {
+                                chunk.embeddingError
+                              }
+                            </p>
+                          )}
+
+                          <p>
+                            {chunk.content}
                           </p>
-                        )}
-
-                        <p>
-                          {chunk.content}
-                        </p>
-                      </article>
+                        </div>
+                      </details>
                     ),
                   )}
                 </div>
