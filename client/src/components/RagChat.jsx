@@ -382,14 +382,6 @@ function RagChat() {
           </p>
         </div>
 
-        <button
-          type="button"
-          className="rag-chat__clear-button"
-          onClick={handleNewConversation}
-          disabled={isLoading || isLoadingConversations}
-        >
-          New chat
-        </button>
       </header>
 
       <div className="rag-chat__filter">
