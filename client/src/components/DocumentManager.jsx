@@ -3,6 +3,10 @@ import {
   useState,
 } from "react";
 import {
+  ArrowClockwiseIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
+import {
   deleteDocument,
   generateDocumentEmbeddings,
   getDocument,
@@ -495,7 +499,9 @@ function DocumentManager() {
                         item.originalName
                       }
                     </strong>
+                  </button>
 
+                  <div className="document-card-metadata">
                     <span>
                       {item.pageCount}{" "}
                       pages
@@ -538,7 +544,7 @@ function DocumentManager() {
                         }
                       </span>
                     )}
-                  </button>
+                  </div>
 
                   <div className="document-card-actions">
                     {embeddingStatus !==
@@ -556,6 +562,11 @@ function DocumentManager() {
                           isDeleting
                         }
                       >
+                        <ArrowClockwiseIcon
+                          size={16}
+                          weight="bold"
+                          aria-hidden="true"
+                        />
                         {isEmbedding
                           ? "Generating..."
                           : embeddingStatus ===
@@ -583,6 +594,11 @@ function DocumentManager() {
                           isDeleting
                         }
                       >
+                        <ArrowClockwiseIcon
+                          size={16}
+                          weight="bold"
+                          aria-hidden="true"
+                        />
                         {isEmbedding
                           ? "Regenerating..."
                           : "Regenerate"}
@@ -602,6 +618,11 @@ function DocumentManager() {
                         isEmbedding
                       }
                     >
+                      <TrashIcon
+                        size={16}
+                        weight="bold"
+                        aria-hidden="true"
+                      />
                       {isDeleting
                         ? "Deleting..."
                         : "Delete"}

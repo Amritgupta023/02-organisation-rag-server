@@ -587,15 +587,11 @@ button:disabled {
 
 .document-card {
   display: flex;
+  flex-wrap: wrap;
   margin-bottom: 10px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
   border-radius: 9px;
-  cursor: pointer;
-}
-
-.document-card:active {
-  transform: scale(0.995);
 }
 
 .document-card--active {
@@ -605,10 +601,9 @@ button:disabled {
 .document-view-button {
   display: flex;
   flex: 1;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
   min-width: 0;
-  padding: 12px;
+  padding: 12px 12px 7px;
   text-align: left;
   background: #ffffff;
   border: 0;
@@ -624,17 +619,51 @@ button:disabled {
   white-space: nowrap;
 }
 
-.document-view-button span {
+.document-card-metadata {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 0 12px 10px;
+}
+
+.document-card-metadata span {
   color: #6b7280;
   font-size: 12px;
 }
 
+.document-card-actions {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.embedding-button,
 .document-delete-button {
-  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.embedding-button {
+  flex: 1;
+  color: #292929;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+}
+
+.document-delete-button {
+  flex: 0 0 auto;
   color: #b91c1c;
   background: #ffffff;
-  border: 0;
-  border-left: 1px solid #e5e7eb;
+  border: 1px solid #e5e7eb;
 }
 
 .document-delete-button:hover {
