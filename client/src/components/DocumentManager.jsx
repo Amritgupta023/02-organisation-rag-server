@@ -501,51 +501,6 @@ function DocumentManager() {
                     </strong>
                   </button>
 
-                  <div className="document-card-metadata">
-                    <span>
-                      {item.pageCount}{" "}
-                      pages
-                    </span>
-
-                    <span>
-                      {item.chunkCount}{" "}
-                      chunks
-                    </span>
-
-                    <span>
-                      {formatFileSize(
-                        item.fileSize,
-                      )}
-                    </span>
-
-                    <span>
-                      Document:{" "}
-                      {item.status}
-                    </span>
-
-                    <span>
-                      Embeddings:{" "}
-                      {embeddingStatus}
-                    </span>
-
-                    <span>
-                      Embedded:{" "}
-                      {item.embeddedChunkCount ||
-                        0}
-                      /{item.chunkCount}
-                    </span>
-
-                    {item.failedChunkCount >
-                      0 && (
-                      <span>
-                        Failed:{" "}
-                        {
-                          item.failedChunkCount
-                        }
-                      </span>
-                    )}
-                  </div>
-
                   <div className="document-card-actions">
                     {embeddingStatus !==
                       "completed" && (
