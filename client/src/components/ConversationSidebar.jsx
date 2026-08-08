@@ -1,77 +1,104 @@
 function ConversationSidebar({
   conversations,
   selectedConversationId,
+  activeSection,
   isLoading,
   onNewConversation,
   onSelectConversation,
   onDeleteConversation,
+  onSelectSection,
 }) {
+  function openNewChat() {
+    onSelectSection("chat");
+    onNewConversation();
+  }
+
+  function openConversation(conversationId) {
+    onSelectSection("chat");
+    onSelectConversation(conversationId);
+  }
+
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
-        <h2>Chats</h2>
+      <div className="sidebar__top">
+        <div className="sidebar__brand">
+          <span className="sidebar__brand-mark">O</span>
+          <span>Organisation AI</span>
+        </div>
 
         <button
           type="button"
-          className="new-chat-button"
-          onClick={onNewConversation}
+          className="sidebar__primary-action"
+          onClick={openNewChat}
           disabled={isLoading}
         >
-          + New chat
+          <span aria-hidden="true">＋</span>
+          New chat
         </button>
+
+        <nav className="sidebar__nav" aria-label="Main navigation">
+          <button
+            type="button"
+            className={activeSection === "chat" ? "sidebar__nav-item sidebar__nav-item--active" : "sidebar__nav-item"}
+            onClick={() => onSelectSection("chat")}
+          >
+            Chat
+          </button>
+
+          <button
+            type="button"
+            className={activeSection === "documents" ? "sidebar__nav-item sidebar__nav-item--active" : "sidebar__nav-item"}
+            onClick={() => onSelectSection("documents")}
+          >
+            Documents
+          </button>
+        </nav>
       </div>
 
-      <div className="conversation-list">
-        {conversations.length === 0 && (
-          <p className="no-conversations">
-            No saved conversations
-          </p>
-        )}
+      <div className="sidebar__recents">
+        <p className="sidebar__section-label">Recent</p>
 
-        {conversations.map((conversation) => (
-          <div
-            key={conversation.id}
-            className={`conversation-item ${
-              selectedConversationId ===
-              conversation.id
-                ? "conversation-item--active"
-                : ""
-            }`}
-          >
-            <button
-              type="button"
-              className="conversation-select-button"
-              onClick={() =>
-                onSelectConversation(
-                  conversation.id,
-                )
-              }
-              disabled={isLoading}
+        <div className="conversation-list">
+          {conversations.length === 0 && (
+            <p className="no-conversations">Your recent chats will appear here.</p>
+          )}
+
+          {conversations.map((conversation) => (
+            <div
+              key={conversation.id}
+              className={`conversation-item ${selectedConversationId === conversation.id && activeSection === "chat" ? "conversation-item--active" : ""}`}
             >
-              <span className="conversation-title">
-                {conversation.title}
-              </span>
+              <button
+                type="button"
+                className="conversation-select-button"
+                onClick={() => openConversation(conversation.id)}
+                disabled={isLoading}
+                title={conversation.title}
+              >
+                <span className="conversation-title">{conversation.title}</span>
+              </button>
 
-              <span className="conversation-message-count">
-                {conversation.messageCount} messages
-              </span>
-            </button>
+              <button
+                type="button"
+                className="conversation-delete-button"
+                aria-label={`Delete ${conversation.title}`}
+                title="Delete chat"
+                onClick={() => onDeleteConversation(conversation.id)}
+                disabled={isLoading}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
 
-            <button
-              type="button"
-              className="conversation-delete-button"
-              aria-label={`Delete ${conversation.title}`}
-              onClick={() =>
-                onDeleteConversation(
-                  conversation.id,
-                )
-              }
-              disabled={isLoading}
-            >
-              ×
-            </button>
-          </div>
-        ))}
+      <div className="sidebar__footer">
+        <span className="sidebar__avatar">OA</span>
+        <div>
+          <strong>Organisation</strong>
+          <span>Knowledge assistant</span>
+        </div>
       </div>
     </aside>
   );

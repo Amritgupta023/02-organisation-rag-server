@@ -12,6 +12,7 @@ import {
   getConversations,
 } from "../services/conversationApi";
 import ConversationSidebar from "./ConversationSidebar";
+import DocumentManager from "./DocumentManager";
 import "./RagChat.css";
 
 const WELCOME_MESSAGE =
@@ -52,6 +53,7 @@ function formatScore(score) {
 }
 
 function RagChat() {
+  const [activeSection, setActiveSection] = useState("chat");
   const [
     conversations,
     setConversations,
@@ -361,23 +363,22 @@ function RagChat() {
       <ConversationSidebar
         conversations={conversations}
         selectedConversationId={selectedConversationId}
+        activeSection={activeSection}
         isLoading={isLoading || isLoadingConversations}
         onNewConversation={handleNewConversation}
         onSelectConversation={handleSelectConversation}
         onDeleteConversation={handleDeleteConversation}
+        onSelectSection={setActiveSection}
       />
 
+    {activeSection === "chat" ? (
     <section className="rag-chat">
       <header className="rag-chat__header">
         <div>
-          <h2>
-            Organisation RAG Chat
-          </h2>
+          <h2>Organisation Assistant</h2>
 
           <p>
-            Answers are generated from
-            your uploaded document
-            chunks.
+            Answers grounded in your organisation documents
           </p>
         </div>
 
@@ -592,6 +593,11 @@ function RagChat() {
         </button>
       </form>
     </section>
+    ) : (
+      <section className="documents-workspace">
+        <DocumentManager />
+      </section>
+    )}
     </div>
   );
 }

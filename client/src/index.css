@@ -18,7 +18,7 @@ textarea {
 
 .app {
   min-height: 100vh;
-  padding: 40px 16px;
+  /* padding: 40px 16px; */
 }
 
 .chat-container {
