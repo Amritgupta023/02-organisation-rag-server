@@ -5,7 +5,17 @@ import {
 } from "react";
 import { getDocuments } from "../services/documentApi";
 import { askDocumentQuestion } from "../services/ragApi";
+import {
+  createConversation,
+  deleteConversation,
+  getConversation,
+  getConversations,
+} from "../services/conversationApi";
+import ConversationSidebar from "./ConversationSidebar";
 import "./RagChat.css";
+
+const WELCOME_MESSAGE =
+  "Ask me a question about your uploaded organisation documents.";
 
 function createMessage({
   role,
@@ -43,6 +53,20 @@ function formatScore(score) {
 
 function RagChat() {
   const [
+    conversations,
+    setConversations,
+  ] = useState([]);
+
+  const [
+    selectedConversationId,
+    setSelectedConversationId,
+  ] = useState(null);
+
+  const [
+    isLoadingConversations,
+    setIsLoadingConversations,
+  ] = useState(true);
+  const [
     documents,
     setDocuments,
   ] = useState([]);
@@ -63,9 +87,7 @@ function RagChat() {
   ] = useState([
     createMessage({
       role: "assistant",
-
-      content:
-        "Ask me a question about your uploaded organisation documents.",
+      content: WELCOME_MESSAGE,
     }),
   ]);
 
@@ -86,16 +108,24 @@ function RagChat() {
     useRef(null);
 
   useEffect(() => {
-    async function loadDocuments() {
+    let isActive = true;
+
+    async function initialize() {
       try {
         setIsLoadingDocuments(true);
+        setIsLoadingConversations(true);
         setError("");
 
-        const result =
-          await getDocuments();
+        const [documentResult, conversationResult] =
+          await Promise.all([
+            getDocuments(),
+            getConversations(),
+          ]);
+
+        if (!isActive) return;
 
         const embeddedDocuments =
-          result.filter(
+          documentResult.filter(
             (document) =>
               document.embeddingStatus ===
               "completed",
@@ -104,19 +134,130 @@ function RagChat() {
         setDocuments(
           embeddedDocuments,
         );
+
+        setConversations(conversationResult);
+
+        if (conversationResult.length > 0) {
+          const latest = await getConversation(
+            conversationResult[0].id,
+          );
+
+          if (!isActive) return;
+
+          setSelectedConversationId(
+            conversationResult[0].id,
+          );
+          setMessages(
+            latest.messages?.length
+              ? latest.messages.map((message) =>
+                  createMessage({
+                    role: message.role,
+                    content: message.content,
+                    sources: message.sources || [],
+                    grounded: message.grounded || false,
+                  }),
+                )
+              : [
+                  createMessage({
+                    role: "assistant",
+                    content: WELCOME_MESSAGE,
+                  }),
+                ],
+          );
+        }
       } catch (requestError) {
-        setError(
-          requestError.message,
-        );
+        if (isActive) setError(requestError.message);
       } finally {
-        setIsLoadingDocuments(
-          false,
-        );
+        if (isActive) {
+          setIsLoadingDocuments(false);
+          setIsLoadingConversations(false);
+        }
       }
     }
 
-    loadDocuments();
+    initialize();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
+
+  async function refreshConversations() {
+    const result = await getConversations();
+    setConversations(result);
+  }
+
+  async function handleSelectConversation(conversationId) {
+    if (isLoading || conversationId === selectedConversationId) return;
+
+    try {
+      setIsLoadingConversations(true);
+      setError("");
+      const conversation = await getConversation(conversationId);
+
+      setSelectedConversationId(conversationId);
+      setMessages(
+        conversation.messages?.length
+          ? conversation.messages.map((message) =>
+              createMessage({
+                role: message.role,
+                content: message.content,
+                sources: message.sources || [],
+                grounded: message.grounded || false,
+              }),
+            )
+          : [createMessage({ role: "assistant", content: WELCOME_MESSAGE })],
+      );
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  }
+
+  async function handleNewConversation() {
+    try {
+      setIsLoadingConversations(true);
+      setError("");
+      const conversation = await createConversation();
+      setSelectedConversationId(conversation._id || conversation.id);
+      setMessages([
+        createMessage({ role: "assistant", content: WELCOME_MESSAGE }),
+      ]);
+      await refreshConversations();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  }
+
+  async function handleDeleteConversation(conversationId) {
+    try {
+      setIsLoadingConversations(true);
+      setError("");
+      await deleteConversation(conversationId);
+      const remaining = conversations.filter(
+        (conversation) => conversation.id !== conversationId,
+      );
+      setConversations(remaining);
+
+      if (selectedConversationId === conversationId) {
+        if (remaining.length > 0) {
+          await handleSelectConversation(remaining[0].id);
+        } else {
+          setSelectedConversationId(null);
+          setMessages([
+            createMessage({ role: "assistant", content: WELCOME_MESSAGE }),
+          ]);
+        }
+      }
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  }
 
   useEffect(() => {
     messageEndRef.current
@@ -166,7 +307,14 @@ function RagChat() {
           documentId:
             selectedDocumentId ||
             null,
+
+          conversationId:
+            selectedConversationId,
         });
+
+      setSelectedConversationId(
+        String(result.conversationId),
+      );
 
       const assistantMessage =
         createMessage({
@@ -186,6 +334,8 @@ function RagChat() {
         ...previous,
         assistantMessage,
       ]);
+
+      await refreshConversations();
     } catch (requestError) {
       setError(
         requestError.message,
@@ -206,20 +356,17 @@ function RagChat() {
     }
   }
 
-  function handleClearChat() {
-    setMessages([
-      createMessage({
-        role: "assistant",
-
-        content:
-          "Chat cleared. Ask me another question about your uploaded documents.",
-      }),
-    ]);
-
-    setError("");
-  }
-
   return (
+    <div className="rag-chat-layout">
+      <ConversationSidebar
+        conversations={conversations}
+        selectedConversationId={selectedConversationId}
+        isLoading={isLoading || isLoadingConversations}
+        onNewConversation={handleNewConversation}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
+      />
+
     <section className="rag-chat">
       <header className="rag-chat__header">
         <div>
@@ -237,10 +384,10 @@ function RagChat() {
         <button
           type="button"
           className="rag-chat__clear-button"
-          onClick={handleClearChat}
-          disabled={isLoading}
+          onClick={handleNewConversation}
+          disabled={isLoading || isLoadingConversations}
         >
-          Clear chat
+          New chat
         </button>
       </header>
 
@@ -445,6 +592,7 @@ function RagChat() {
         </button>
       </form>
     </section>
+    </div>
   );
 }
 

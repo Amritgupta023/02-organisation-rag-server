@@ -30,6 +30,7 @@ async function parseResponse(
 export async function askDocumentQuestion({
   question,
   documentId,
+  conversationId,
 }) {
   const response = await fetch(
     `${API_BASE_URL}/rag/ask`,
@@ -46,6 +47,9 @@ export async function askDocumentQuestion({
 
         documentId:
           documentId || null,
+
+        conversationId:
+          conversationId || null,
       }),
     },
   );

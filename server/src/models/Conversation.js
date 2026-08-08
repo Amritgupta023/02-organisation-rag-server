@@ -13,6 +13,16 @@ const messageSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
+    sources: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: undefined,
+    },
+
+    grounded: {
+      type: Boolean,
+      default: undefined,
+    },
   },
   {
     timestamps: true,
